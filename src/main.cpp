@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
+#include <esp_sleep.h>
 #include "WebServer.h"
 #include "Scale.h"
 #include "WiFiManager.h"
@@ -9,11 +10,13 @@
 #include "BluetoothScale.h"
 #include "TouchSensor.h"
 #include "Display.h"
+#include "PowerManager.h"
 
 // Pins and calibration
 uint8_t dataPin = 12;
 uint8_t clockPin = 11;
-uint8_t touchPin = 4;  // T0 - Confirmed working touch pin
+uint8_t touchPin = 4;  // T0 - Confirmed working touch pin for tare
+uint8_t sleepTouchPin = 3;  // GPIO3 - Digital touch sensor for sleep functionality
 uint8_t sdaPin = 5;    // I2C Data pin for display (same side as other pins)
 uint8_t sclPin = 6;    // I2C Clock pin for display (same side as other pins)
 float calibrationFactor = 4762.1621;
@@ -22,9 +25,41 @@ FlowRate flowRate;
 BluetoothScale bluetoothScale;
 TouchSensor touchSensor(touchPin, &scale);
 Display oledDisplay(sdaPin, sclPin, &scale, &flowRate);
+PowerManager powerManager(sleepTouchPin, &oledDisplay);
 
 void setup() {
   Serial.begin(115200);
+  
+  // Initialize display FIRST for immediate visual feedback
+  if (!oledDisplay.begin()) {
+    Serial.println("Display initialization failed!");
+  } else {
+    Serial.println("Display initialized - ready for messages");
+  }
+  
+  // Check wake-up reason and show appropriate message
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  switch(wakeup_reason) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      Serial.println("Wakeup caused by external signal (touch sensor)");
+      // Show the same starting message as normal boot for consistency
+      delay(1500);
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+      Serial.println("Wakeup caused by external signal using RTC_CNTL");
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      Serial.println("Wakeup caused by timer");
+      break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD:
+      Serial.println("Wakeup caused by touchpad");
+      break;
+    default:
+      Serial.println("Wakeup was not caused by deep sleep: " + String(wakeup_reason));
+      // For normal startup, the begin() method already shows a startup message
+      delay(1000);
+      break;
+  }
 
   setupWiFi();
 
@@ -36,14 +71,12 @@ void setup() {
   // Initialize touch sensor
   touchSensor.begin();
 
-  // Initialize display
-  if (!oledDisplay.begin()) {
-    Serial.println("Display initialization failed!");
-  } else {
-    // Show IP addresses after WiFi setup
-    delay(100); // Small delay to ensure WiFi is fully initialized
-    oledDisplay.showIPAddresses();
-  }
+  // Initialize power manager
+  powerManager.begin();
+
+  // Show IP addresses and welcome message now that everything is ready
+  delay(100); // Small delay to ensure WiFi is fully initialized
+  oledDisplay.showIPAddresses();
 
   // Link display to touch sensor for tare feedback
   touchSensor.setDisplay(&oledDisplay);
@@ -66,6 +99,9 @@ void loop() {
   
   // Update touch sensor
   touchSensor.update();
+  
+  // Update power manager
+  powerManager.update();
   
   // Update display
   oledDisplay.update();

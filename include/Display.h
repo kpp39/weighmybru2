@@ -15,6 +15,11 @@ public:
     void update();
     void showWeight(float weight);
     void showMessage(const String& message, int duration = 2000);
+    void showSleepCountdown(int seconds); // Show sleep countdown in large format
+    void showSleepMessage(); // Show initial sleep message with big/small text format
+    void showGoingToSleepMessage(); // Show "Touch To / Wake Up" message like WeighMyBru Ready
+    void showSleepCancelledMessage(); // Show "Sleep / Cancelled" message like WeighMyBru Ready
+    void clearMessageState(); // Clear message state to return to weight display
     void showIPAddresses(); // Show WiFi IP addresses
     void clear();
     void setBrightness(uint8_t brightness);
