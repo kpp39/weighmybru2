@@ -132,8 +132,45 @@ void Display::showMessage(const String& message, int duration) {
 }
 
 void Display::showIPAddresses() {
+    // First show the WeighMyBru Ready message for 3 seconds
+    display->clearDisplay();
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    
+    // Calculate text positioning for centering
+    String line1 = "WeighMyBru";
+    String line2 = "Ready";
+    
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    
+    // Get text bounds for both lines
+    display->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    display->getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    
+    // Calculate centered positions - tighter spacing for size 2 text
+    int centerX1 = (SCREEN_WIDTH - w1) / 2;
+    int centerX2 = (SCREEN_WIDTH - w2) / 2;
+    
+    // Position lines closer together to fit in 32 pixels
+    int line1Y = 0;  // Start at top
+    int line2Y = 16; // Second line at pixel 16
+    
+    // Display first line
+    display->setCursor(centerX1, line1Y);
+    display->print(line1);
+    
+    // Display second line
+    display->setCursor(centerX2, line2Y);
+    display->print(line2);
+    
+    display->display();
+    delay(3000);
+    
+    // Then show IP addresses
     display->clearDisplay();
     display->setTextSize(1);
+    display->setTextColor(SSD1306_WHITE);
     
     String apIP = "AP: " + WiFi.softAPIP().toString();
     String staIP = "";
@@ -145,20 +182,33 @@ void Display::showIPAddresses() {
         staIP = "STA: Not Connected";
     }
     
-    // Display AP IP
-    display->setCursor(0, 0);
+    // Calculate text positioning for centering IP addresses
+    int16_t ipX1, ipY1;
+    uint16_t ipW1, ipH1, ipW2, ipH2;
+    
+    // Get text bounds for both IP lines
+    display->getTextBounds(apIP, 0, 0, &ipX1, &ipY1, &ipW1, &ipH1);
+    display->getTextBounds(staIP, 0, 0, &ipX1, &ipY1, &ipW2, &ipH2);
+    
+    // Calculate centered positions
+    int ipCenterX1 = (SCREEN_WIDTH - ipW1) / 2;
+    int ipCenterX2 = (SCREEN_WIDTH - ipW2) / 2;
+    
+    // Position lines to fit nicely in 32 pixels
+    int ipLine1Y = 4;   // Start a bit from top
+    int ipLine2Y = 20;  // Second line lower
+    
+    // Display AP IP - centered
+    display->setCursor(ipCenterX1, ipLine1Y);
     display->print(apIP);
     
-    // Display STA IP
-    display->setCursor(0, 12);
+    // Display STA IP - centered
+    display->setCursor(ipCenterX2, ipLine2Y);
     display->print(staIP);
     
     // Show for 3 seconds
     display->display();
     delay(3000);
-    
-    // Now show the WeighMyBru Ready message for 3 seconds
-    showMessage("WeighMyBru Ready!", 3000);
 }
 
 void Display::clear() {
