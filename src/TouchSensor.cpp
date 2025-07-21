@@ -56,7 +56,7 @@ void TouchSensor::handleTouch() {
         
         // Show tare message on display if available
         if (displayPtr != nullptr) {
-            displayPtr->showMessage("Taring...", 2000);
+            displayPtr->showTaringMessage();
         }
         
         scalePtr->tare();
@@ -64,7 +64,7 @@ void TouchSensor::handleTouch() {
         
         // Show completion message on display if available
         if (displayPtr != nullptr) {
-            displayPtr->showMessage("Tared!", 1000);
+            displayPtr->showTaredMessage();
         }
     } else {
         Serial.println("Error: Scale pointer is null");

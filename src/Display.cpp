@@ -87,12 +87,19 @@ void Display::showWeight(float weight) {
     
     display->clearDisplay();
     
+    // Apply deadband to prevent flickering between 0.0g and -0.0g
+    // Show 0.0g (without negative sign) when weight is between -0.1g and +0.1g
+    float displayWeight = weight;
+    if (weight >= -0.1 && weight <= 0.1) {
+        displayWeight = 0.0; // Force to exactly 0.0 to avoid negative sign
+    }
+    
     // Format weight string with consistent spacing
     String weightStr;
-    if (weight < 0) {
-        weightStr = String(weight, 1); // Keep negative sign
+    if (displayWeight < 0) {
+        weightStr = String(displayWeight, 1); // Keep negative sign for values below -0.1g
     } else {
-        weightStr = " " + String(weight, 1); // Add space where negative sign would be
+        weightStr = " " + String(displayWeight, 1); // Add space where negative sign would be
     }
     weightStr += "g";
     
@@ -115,12 +122,19 @@ void Display::showWeight(float weight) {
         currentFlowRate = flowRatePtr->getFlowRate();
     }
     
+    // Apply deadband to prevent flickering between 0.0g/s and -0.0g/s
+    // Show 0.0g/s (without negative sign) when flow rate is between -0.1g/s and +0.1g/s
+    float displayFlowRate = currentFlowRate;
+    if (currentFlowRate >= -0.1 && currentFlowRate <= 0.1) {
+        displayFlowRate = 0.0; // Force to exactly 0.0 to avoid negative sign
+    }
+    
     // Format flow rate string with consistent spacing
     String flowRateStr = "Flow Rate: ";
-    if (currentFlowRate < 0) {
-        flowRateStr += String(currentFlowRate, 1); // Keep negative sign
+    if (displayFlowRate < 0) {
+        flowRateStr += String(displayFlowRate, 1); // Keep negative sign for values below -0.1g/s
     } else {
-        flowRateStr += " " + String(currentFlowRate, 1); // Add space where negative sign would be
+        flowRateStr += " " + String(displayFlowRate, 1); // Add space where negative sign would be
     }
     flowRateStr += "g/s";
     
@@ -295,6 +309,89 @@ void Display::showSleepCancelledMessage() {
     // Calculate text positioning for centering
     String line1 = "Sleep";
     String line2 = "Cancelled";
+    
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    
+    // Get text bounds for both lines
+    display->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    display->getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    
+    // Calculate centered positions - tighter spacing for size 2 text
+    int centerX1 = (SCREEN_WIDTH - w1) / 2;
+    int centerX2 = (SCREEN_WIDTH - w2) / 2;
+    
+    // Position lines closer together to fit in 32 pixels
+    int line1Y = 0;  // Start at top
+    int line2Y = 16; // Second line at pixel 16
+    
+    // Display first line
+    display->setCursor(centerX1, line1Y);
+    display->print(line1);
+    
+    // Display second line
+    display->setCursor(centerX2, line2Y);
+    display->print(line2);
+    
+    display->display();
+}
+
+void Display::showTaringMessage() {
+    // Set message state to prevent weight display interference
+    currentMessage = "Taring message";
+    messageStartTime = millis();
+    showingMessage = true;
+    
+    // Show "Taring..." in same format as WeighMyBru Ready
+    display->clearDisplay();
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    
+    // Since "Taring..." is a single word, we'll center it on one line
+    // For consistency with WeighMyBru style, we can split it as "Taring" and "..."
+    String line1 = "Taring";
+    String line2 = "...";
+    
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    
+    // Get text bounds for both lines
+    display->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    display->getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    
+    // Calculate centered positions - tighter spacing for size 2 text
+    int centerX1 = (SCREEN_WIDTH - w1) / 2;
+    int centerX2 = (SCREEN_WIDTH - w2) / 2;
+    
+    // Position lines closer together to fit in 32 pixels
+    int line1Y = 0;  // Start at top
+    int line2Y = 16; // Second line at pixel 16
+    
+    // Display first line
+    display->setCursor(centerX1, line1Y);
+    display->print(line1);
+    
+    // Display second line
+    display->setCursor(centerX2, line2Y);
+    display->print(line2);
+    
+    display->display();
+}
+
+void Display::showTaredMessage() {
+    // Set message state to prevent weight display interference
+    currentMessage = "Tared message";
+    messageStartTime = millis();
+    showingMessage = true;
+    
+    // Show "Tared!" in same format as WeighMyBru Ready
+    display->clearDisplay();
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    
+    // Split "Tared!" into two lines for better visual impact
+    String line1 = "Scale";
+    String line2 = "Tared!";
     
     int16_t x1, y1;
     uint16_t w1, h1, w2, h2;

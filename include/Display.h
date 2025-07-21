@@ -19,6 +19,8 @@ public:
     void showSleepMessage(); // Show initial sleep message with big/small text format
     void showGoingToSleepMessage(); // Show "Touch To / Wake Up" message like WeighMyBru Ready
     void showSleepCancelledMessage(); // Show "Sleep / Cancelled" message like WeighMyBru Ready
+    void showTaringMessage(); // Show "Taring..." message like WeighMyBru Ready
+    void showTaredMessage(); // Show "Tared!" message like WeighMyBru Ready
     void clearMessageState(); // Clear message state to return to weight display
     void showIPAddresses(); // Show WiFi IP addresses
     void clear();
