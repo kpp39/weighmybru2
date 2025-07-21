@@ -4,7 +4,8 @@
 
 TouchSensor::TouchSensor(uint8_t touchPin, Scale* scale) 
     : touchPin(touchPin), scalePtr(scale), displayPtr(nullptr), touchThreshold(30000), 
-      lastTouchState(false), lastTouchTime(0), debounceDelay(200) {
+      lastTouchState(false), lastTouchTime(0), touchStartTime(0), debounceDelay(200),
+      longPressDetected(false) {
 }
 
 void TouchSensor::begin() {
@@ -21,11 +22,29 @@ void TouchSensor::update() {
     if (currentTouchState != lastTouchState) {
         if (currentTime - lastTouchTime > debounceDelay) {
             if (currentTouchState) {
-                // Touch detected - trigger tare
-                handleTouch();
+                // Touch started - record start time for long press detection
+                touchStartTime = currentTime;
+                longPressDetected = false;
+                Serial.println("Touch started");
+            } else {
+                // Touch ended
+                if (!longPressDetected) {
+                    // Short press - trigger tare
+                    handleTouch();
+                }
+                longPressDetected = false;
+                Serial.println("Touch ended");
             }
             lastTouchState = currentTouchState;
             lastTouchTime = currentTime;
+        }
+    }
+    
+    // Check for long press (1 second) while touch is active
+    if (currentTouchState && !longPressDetected) {
+        if (currentTime - touchStartTime >= 1000) {
+            longPressDetected = true;
+            handleLongPress();
         }
     }
 }
@@ -68,5 +87,16 @@ void TouchSensor::handleTouch() {
         }
     } else {
         Serial.println("Error: Scale pointer is null");
+    }
+}
+
+void TouchSensor::handleLongPress() {
+    Serial.println("Long press detected! Switching mode...");
+    
+    if (displayPtr != nullptr) {
+        displayPtr->nextMode();
+        Serial.println("Mode switched");
+    } else {
+        Serial.println("Error: Display pointer is null");
     }
 }

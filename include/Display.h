@@ -8,6 +8,12 @@
 class Scale; // Forward declaration
 class FlowRate; // Forward declaration
 
+enum class ScaleMode {
+    FLOW = 0,
+    TIME = 1,
+    AUTO = 2
+};
+
 class Display {
 public:
     Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate);
@@ -21,10 +27,23 @@ public:
     void showSleepCancelledMessage(); // Show "Sleep / Cancelled" message like WeighMyBru Ready
     void showTaringMessage(); // Show "Taring..." message like WeighMyBru Ready
     void showTaredMessage(); // Show "Tared!" message like WeighMyBru Ready
+    void showModeMessage(ScaleMode mode); // Show mode name like WeighMyBru Ready
     void clearMessageState(); // Clear message state to return to weight display
     void showIPAddresses(); // Show WiFi IP addresses
     void clear();
     void setBrightness(uint8_t brightness);
+    
+    // Mode management
+    void setMode(ScaleMode mode);
+    ScaleMode getMode() const;
+    void nextMode();
+    
+    // Timer management for TIME mode
+    void startTimer();
+    void stopTimer();
+    void resetTimer();
+    bool isTimerRunning() const;
+    unsigned long getTimerSeconds() const;
     
 private:
     uint8_t sdaPin;
@@ -42,7 +61,17 @@ private:
     bool showingMessage;
     String currentMessage;
     
+    // Mode system
+    ScaleMode currentMode;
+    
+    // Timer system for TIME mode
+    unsigned long timerStartTime;
+    unsigned long timerPausedTime;
+    bool timerRunning;
+    bool timerPaused;
+    
     void drawWeight(float weight);
+    void showWeightWithTimer(float weight); // For TIME mode display
     void setupDisplay();
 };
 

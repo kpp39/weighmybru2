@@ -16,6 +16,9 @@ public:
     bool isSleepTouchPressed();
     void setDisplay(Display* display);
     
+    // Timer control for TIME mode
+    void handleTimerControl();
+    
 private:
     uint8_t sleepTouchPin;
     Display* displayPtr;
@@ -29,6 +32,14 @@ private:
     bool longPressDetected;
     bool cancelledRecently;
     unsigned long cancelTime;
+    
+    // Timer control state
+    enum class TimerState {
+        STOPPED = 0,
+        RUNNING = 1,
+        PAUSED = 2
+    };
+    TimerState timerState;
     
     void handleSleepTouch();
     void showSleepCountdown(int seconds);

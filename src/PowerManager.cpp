@@ -5,7 +5,8 @@ PowerManager::PowerManager(uint8_t sleepTouchPin, Display* display)
     : sleepTouchPin(sleepTouchPin), displayPtr(display), sleepTouchThreshold(0),
       lastSleepTouchState(false), lastSleepTouchTime(0), touchStartTime(0),
       debounceDelay(50), sleepCountdownStart(0), sleepCountdownActive(false),
-      longPressDetected(false), cancelledRecently(false), cancelTime(0) {
+      longPressDetected(false), cancelledRecently(false), cancelTime(0),
+      timerState(TimerState::STOPPED) {
 }
 
 void PowerManager::begin() {
@@ -66,15 +67,26 @@ void PowerManager::update() {
                         displayPtr->showSleepCancelledMessage();
                     }
                 } else if (!cancelledRecently) {
-                    // New touch - start timing for long press (only if not recently cancelled)
-                    touchStartTime = currentTime;
-                    longPressDetected = false;
-                    Serial.println("Sleep touch started");
+                    // Check current mode to determine behavior
+                    if (displayPtr != nullptr && displayPtr->getMode() == ScaleMode::TIME) {
+                        // In TIME mode - handle timer control with short press
+                        handleTimerControl();
+                    } else {
+                        // In other modes - start timing for long press (sleep functionality)
+                        touchStartTime = currentTime;
+                        longPressDetected = false;
+                        Serial.println("Sleep touch started");
+                    }
                 }
             } else {
                 // Touch ended
                 if (!sleepCountdownActive && !longPressDetected && !cancelledRecently) {
-                    Serial.println("Sleep touch released (short press - no action)");
+                    // Check if we're in TIME mode for timer control
+                    if (displayPtr != nullptr && displayPtr->getMode() == ScaleMode::TIME) {
+                        handleTimerControl();
+                    } else {
+                        Serial.println("Sleep touch released (short press - no action in FLOW/AUTO mode)");
+                    }
                 }
                 // Don't reset longPressDetected here if countdown is active
                 if (!sleepCountdownActive) {
@@ -86,11 +98,14 @@ void PowerManager::update() {
         }
     }
     
-    // Check for long press (1 second) - only if not already in countdown and not recently cancelled
+    // Check for long press (1 second) - only if not already in countdown, not recently cancelled, and not in TIME mode
     if (currentSleepTouchState && !longPressDetected && !sleepCountdownActive && !cancelledRecently) {
-        if (currentTime - touchStartTime >= 1000) {
-            longPressDetected = true;
-            handleSleepTouch();
+        // Only check for long press if not in TIME mode (TIME mode uses short presses for timer control)
+        if (displayPtr == nullptr || displayPtr->getMode() != ScaleMode::TIME) {
+            if (currentTime - touchStartTime >= 1000) {
+                longPressDetected = true;
+                handleSleepTouch();
+            }
         }
     }
 }
@@ -143,5 +158,34 @@ void PowerManager::handleSleepTouch() {
 void PowerManager::showSleepCountdown(int seconds) {
     if (displayPtr != nullptr) {
         displayPtr->showSleepCountdown(seconds);
+    }
+}
+
+void PowerManager::handleTimerControl() {
+    if (displayPtr == nullptr) return;
+    
+    Serial.println("Timer control triggered");
+    
+    switch (timerState) {
+        case TimerState::STOPPED:
+            // First tap - start timer
+            displayPtr->startTimer();
+            timerState = TimerState::RUNNING;
+            Serial.println("Timer started");
+            break;
+            
+        case TimerState::RUNNING:
+            // Second tap - stop/pause timer
+            displayPtr->stopTimer();
+            timerState = TimerState::PAUSED;
+            Serial.println("Timer stopped/paused");
+            break;
+            
+        case TimerState::PAUSED:
+            // Third tap - reset timer
+            displayPtr->resetTimer();
+            timerState = TimerState::STOPPED;
+            Serial.println("Timer reset");
+            break;
     }
 }

@@ -5,7 +5,8 @@
 
 Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate)
     : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate),
-      messageStartTime(0), showingMessage(false) {
+      messageStartTime(0), showingMessage(false), currentMode(ScaleMode::FLOW),
+      timerStartTime(0), timerPausedTime(0), timerRunning(false), timerPaused(false) {
     display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 }
 
@@ -85,67 +86,20 @@ void Display::update() {
 void Display::showWeight(float weight) {
     if (showingMessage) return; // Don't override messages
     
-    display->clearDisplay();
-    
-    // Apply deadband to prevent flickering between 0.0g and -0.0g
-    // Show 0.0g (without negative sign) when weight is between -0.1g and +0.1g
-    float displayWeight = weight;
-    if (weight >= -0.1 && weight <= 0.1) {
-        displayWeight = 0.0; // Force to exactly 0.0 to avoid negative sign
+    // Handle different modes
+    switch (currentMode) {
+        case ScaleMode::FLOW:
+            drawWeight(weight); // Use existing flow rate display
+            break;
+        case ScaleMode::TIME:
+            showWeightWithTimer(weight); // New timer display
+            break;
+        case ScaleMode::AUTO:
+            // For now, AUTO mode acts like FLOW mode
+            // This can be enhanced later with automatic mode switching logic
+            drawWeight(weight);
+            break;
     }
-    
-    // Format weight string with consistent spacing
-    String weightStr;
-    if (displayWeight < 0) {
-        weightStr = String(displayWeight, 1); // Keep negative sign for values below -0.1g
-    } else {
-        weightStr = " " + String(displayWeight, 1); // Add space where negative sign would be
-    }
-    weightStr += "g";
-    
-    // Calculate text width for centering weight
-    display->setTextSize(2);
-    int16_t x1, y1;
-    uint16_t textWidth, textHeight;
-    display->getTextBounds(weightStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
-    
-    // Center the weight text horizontally
-    int centerX = (SCREEN_WIDTH - textWidth) / 2;
-    
-    // Large weight display - centered at top
-    display->setCursor(centerX, 0);
-    display->print(weightStr);
-    
-    // Get flow rate and format it
-    float currentFlowRate = 0.0;
-    if (flowRatePtr != nullptr) {
-        currentFlowRate = flowRatePtr->getFlowRate();
-    }
-    
-    // Apply deadband to prevent flickering between 0.0g/s and -0.0g/s
-    // Show 0.0g/s (without negative sign) when flow rate is between -0.1g/s and +0.1g/s
-    float displayFlowRate = currentFlowRate;
-    if (currentFlowRate >= -0.1 && currentFlowRate <= 0.1) {
-        displayFlowRate = 0.0; // Force to exactly 0.0 to avoid negative sign
-    }
-    
-    // Format flow rate string with consistent spacing
-    String flowRateStr = "Flow Rate: ";
-    if (displayFlowRate < 0) {
-        flowRateStr += String(displayFlowRate, 1); // Keep negative sign for values below -0.1g/s
-    } else {
-        flowRateStr += " " + String(displayFlowRate, 1); // Add space where negative sign would be
-    }
-    flowRateStr += "g/s";
-    
-    // Small flow rate text at bottom - centered
-    display->setTextSize(1);
-    display->getTextBounds(flowRateStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
-    int flowRateCenterX = (SCREEN_WIDTH - textWidth) / 2;
-    display->setCursor(flowRateCenterX, 24);
-    display->print(flowRateStr);
-    
-    display->display();
 }
 
 void Display::showMessage(const String& message, int duration) {
@@ -514,4 +468,228 @@ void Display::setBrightness(uint8_t brightness) {
     // SSD1306 doesn't have brightness control, but we can simulate with contrast
     display->ssd1306_command(SSD1306_SETCONTRAST);
     display->ssd1306_command(brightness);
+}
+
+void Display::drawWeight(float weight) {
+    display->clearDisplay();
+    
+    // Apply deadband to prevent flickering between 0.0g and -0.0g
+    // Show 0.0g (without negative sign) when weight is between -0.1g and +0.1g
+    float displayWeight = weight;
+    if (weight >= -0.1 && weight <= 0.1) {
+        displayWeight = 0.0; // Force to exactly 0.0 to avoid negative sign
+    }
+    
+    // Format weight string with consistent spacing
+    String weightStr;
+    if (displayWeight < 0) {
+        weightStr = String(displayWeight, 1); // Keep negative sign for values below -0.1g
+    } else {
+        weightStr = " " + String(displayWeight, 1); // Add space where negative sign would be
+    }
+    weightStr += "g";
+    
+    // Calculate text width for centering weight
+    display->setTextSize(2);
+    int16_t x1, y1;
+    uint16_t textWidth, textHeight;
+    display->getTextBounds(weightStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    
+    // Center the weight text horizontally
+    int centerX = (SCREEN_WIDTH - textWidth) / 2;
+    
+    // Large weight display - centered at top
+    display->setCursor(centerX, 0);
+    display->print(weightStr);
+    
+    // Get flow rate and format it
+    float currentFlowRate = 0.0;
+    if (flowRatePtr != nullptr) {
+        currentFlowRate = flowRatePtr->getFlowRate();
+    }
+    
+    // Apply deadband to prevent flickering between 0.0g/s and -0.0g/s
+    // Show 0.0g/s (without negative sign) when flow rate is between -0.1g/s and +0.1g/s
+    float displayFlowRate = currentFlowRate;
+    if (currentFlowRate >= -0.1 && currentFlowRate <= 0.1) {
+        displayFlowRate = 0.0; // Force to exactly 0.0 to avoid negative sign
+    }
+    
+    // Format flow rate string with consistent spacing
+    String flowRateStr = "Flow Rate: ";
+    if (displayFlowRate < 0) {
+        flowRateStr += String(displayFlowRate, 1); // Keep negative sign for values below -0.1g/s
+    } else {
+        flowRateStr += " " + String(displayFlowRate, 1); // Add space where negative sign would be
+    }
+    flowRateStr += "g/s";
+    
+    // Small flow rate text at bottom - centered
+    display->setTextSize(1);
+    display->getTextBounds(flowRateStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    int flowRateCenterX = (SCREEN_WIDTH - textWidth) / 2;
+    display->setCursor(flowRateCenterX, 24);
+    display->print(flowRateStr);
+    
+    display->display();
+}
+
+void Display::showWeightWithTimer(float weight) {
+    display->clearDisplay();
+    
+    // Apply deadband to prevent flickering between 0.0g and -0.0g
+    float displayWeight = weight;
+    if (weight >= -0.1 && weight <= 0.1) {
+        displayWeight = 0.0;
+    }
+    
+    // Format weight string with consistent spacing
+    String weightStr;
+    if (displayWeight < 0) {
+        weightStr = String(displayWeight, 1);
+    } else {
+        weightStr = " " + String(displayWeight, 1);
+    }
+    weightStr += "g";
+    
+    // Calculate text width for centering weight
+    display->setTextSize(2);
+    int16_t x1, y1;
+    uint16_t textWidth, textHeight;
+    display->getTextBounds(weightStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    
+    // Center the weight text horizontally
+    int centerX = (SCREEN_WIDTH - textWidth) / 2;
+    
+    // Large weight display - centered at top
+    display->setCursor(centerX, 0);
+    display->print(weightStr);
+    
+    // Show timer instead of flow rate
+    unsigned long currentTime = getTimerSeconds();
+    String timerStr = "Timer: " + String(currentTime) + "s";
+    
+    // Small timer text at bottom - centered
+    display->setTextSize(1);
+    display->getTextBounds(timerStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    int timerCenterX = (SCREEN_WIDTH - textWidth) / 2;
+    display->setCursor(timerCenterX, 24);
+    display->print(timerStr);
+    
+    display->display();
+}
+
+void Display::showModeMessage(ScaleMode mode) {
+    // Set message state to prevent weight display interference
+    currentMessage = "Mode change message";
+    messageStartTime = millis();
+    showingMessage = true;
+    
+    // Show mode name in same format as WeighMyBru Ready
+    display->clearDisplay();
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    
+    // Get mode name
+    String line1, line2;
+    switch (mode) {
+        case ScaleMode::FLOW:
+            line1 = "Flow";
+            line2 = "Mode";
+            break;
+        case ScaleMode::TIME:
+            line1 = "Time";
+            line2 = "Mode";
+            break;
+        case ScaleMode::AUTO:
+            line1 = "Auto";
+            line2 = "Mode";
+            break;
+    }
+    
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    
+    // Get text bounds for both lines
+    display->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    display->getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    
+    // Calculate centered positions - tighter spacing for size 2 text
+    int centerX1 = (SCREEN_WIDTH - w1) / 2;
+    int centerX2 = (SCREEN_WIDTH - w2) / 2;
+    
+    // Position lines closer together to fit in 32 pixels
+    int line1Y = 0;  // Start at top
+    int line2Y = 16; // Second line at pixel 16
+    
+    // Display first line
+    display->setCursor(centerX1, line1Y);
+    display->print(line1);
+    
+    // Display second line
+    display->setCursor(centerX2, line2Y);
+    display->print(line2);
+    
+    display->display();
+}
+
+// Mode management methods
+void Display::setMode(ScaleMode mode) {
+    currentMode = mode;
+    showModeMessage(mode); // Show mode change message
+}
+
+ScaleMode Display::getMode() const {
+    return currentMode;
+}
+
+void Display::nextMode() {
+    switch (currentMode) {
+        case ScaleMode::FLOW:
+            setMode(ScaleMode::TIME);
+            break;
+        case ScaleMode::TIME:
+            setMode(ScaleMode::AUTO);
+            break;
+        case ScaleMode::AUTO:
+            setMode(ScaleMode::FLOW);
+            break;
+    }
+}
+
+// Timer management methods
+void Display::startTimer() {
+    if (!timerRunning) {
+        timerStartTime = millis();
+        timerRunning = true;
+        timerPaused = false;
+    }
+}
+
+void Display::stopTimer() {
+    if (timerRunning && !timerPaused) {
+        timerPausedTime = millis() - timerStartTime;
+        timerPaused = true;
+    }
+}
+
+void Display::resetTimer() {
+    timerStartTime = 0;
+    timerPausedTime = 0;
+    timerRunning = false;
+    timerPaused = false;
+}
+
+bool Display::isTimerRunning() const {
+    return timerRunning && !timerPaused;
+}
+
+unsigned long Display::getTimerSeconds() const {
+    if (!timerRunning) {
+        return 0;
+    } else if (timerPaused) {
+        return timerPausedTime / 1000;
+    } else {
+        return (millis() - timerStartTime) / 1000;
+    }
 }

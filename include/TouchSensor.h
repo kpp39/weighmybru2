@@ -23,9 +23,12 @@ private:
     uint16_t touchThreshold;
     bool lastTouchState;
     unsigned long lastTouchTime;
+    unsigned long touchStartTime;
     unsigned long debounceDelay;
+    bool longPressDetected;
     
     void handleTouch();
+    void handleLongPress();
 };
 
 #endif
