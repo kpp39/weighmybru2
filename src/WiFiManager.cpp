@@ -1,6 +1,7 @@
 #include "WiFiManager.h"
 #include <WiFi.h>
 #include <Preferences.h>
+#include <ESPmDNS.h>
 
 Preferences wifiPrefs;
 
@@ -135,8 +136,31 @@ void setupWiFi() {
         }
         if (WiFi.status() == WL_CONNECTED) {
             Serial.println("\nConnected to STA with IP: " + WiFi.localIP().toString());
+            setupmDNS(); // Setup mDNS hostname
         } else {
             Serial.println("\nFailed to connect to STA. Continuing in AP mode...");
+            setupmDNS(); // Setup mDNS even in AP mode
         }
+    } else {
+        setupmDNS(); // Setup mDNS even without STA credentials
+    }
+}
+
+void setupmDNS() {
+    // Start mDNS service with hostname "weighmybru"
+    if (MDNS.begin("weighmybru")) {
+        Serial.println("mDNS responder started");
+        Serial.println("Access the scale at: http://weighmybru.local");
+        
+        // Add service to MDNS-SD
+        MDNS.addService("http", "tcp", 80);
+        MDNS.addService("websocket", "tcp", 81);
+        
+        // Add some useful service properties
+        MDNS.addServiceTxt("http", "tcp", "device", "WeighMyBru Coffee Scale");
+        MDNS.addServiceTxt("http", "tcp", "version", "2.0");
+        
+    } else {
+        Serial.println("Error starting mDNS responder");
     }
 }
