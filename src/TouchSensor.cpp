@@ -81,6 +81,17 @@ void TouchSensor::handleTouch() {
         scalePtr->tare();
         Serial.println("Scale tared successfully");
         
+        // Reset timer when manual tare is pressed
+        if (displayPtr != nullptr) {
+            displayPtr->resetTimer();
+            Serial.println("Timer reset with manual tare");
+        }
+        
+        // Reset auto sequence if in Auto mode
+        if (displayPtr != nullptr) {
+            displayPtr->resetAutoSequence();
+        }
+        
         // Show completion message on display if available
         if (displayPtr != nullptr) {
             displayPtr->showTaredMessage();

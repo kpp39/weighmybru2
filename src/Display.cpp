@@ -5,8 +5,11 @@
 
 Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate)
     : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate),
-      messageStartTime(0), showingMessage(false), currentMode(ScaleMode::FLOW),
-      timerStartTime(0), timerPausedTime(0), timerRunning(false), timerPaused(false) {
+      messageStartTime(0), messageDuration(2000), showingMessage(false), currentMode(ScaleMode::FLOW),
+      timerStartTime(0), timerPausedTime(0), timerRunning(false), timerPaused(false),
+      lastWeight(0.0), lastWeightChangeTime(0), waitingForStabilization(false),
+      weightWhenChanged(0.0), stabilizationStartTime(0), autoTareEnabled(true),
+      lastFlowRate(0.0), autoTimerStarted(false) {
     display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 }
 
@@ -69,7 +72,7 @@ void Display::setupDisplay() {
 void Display::update() {
     // Check if we're showing a temporary message
     if (showingMessage) {
-        if (millis() - messageStartTime > 2000) { // Default 2 second duration
+        if (millis() - messageStartTime > messageDuration) { // Use stored duration
             showingMessage = false;
         } else {
             return; // Keep showing the message
@@ -95,9 +98,7 @@ void Display::showWeight(float weight) {
             showWeightWithTimer(weight); // New timer display
             break;
         case ScaleMode::AUTO:
-            // For now, AUTO mode acts like FLOW mode
-            // This can be enhanced later with automatic mode switching logic
-            drawWeight(weight);
+            showWeightWithFlowAndTimer(weight); // Show both flow rate and timer
             break;
     }
 }
@@ -105,6 +106,7 @@ void Display::showWeight(float weight) {
 void Display::showMessage(const String& message, int duration) {
     currentMessage = message;
     messageStartTime = millis();
+    messageDuration = duration; // Store the duration
     showingMessage = true;
     
     display->clearDisplay();
@@ -373,6 +375,48 @@ void Display::showTaredMessage() {
     display->display();
 }
 
+void Display::showAutoTaredMessage() {
+    // Set message state to prevent weight display interference
+    currentMessage = "Auto Tared message";
+    messageStartTime = millis();
+    messageDuration = 1500; // Show for 1.5 seconds (reduced from 3 seconds)
+    showingMessage = true;
+    
+    // Show "Auto Tared!" in same format as WeighMyBru Ready
+    display->clearDisplay();
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    
+    // Split "Auto Tared!" into two lines for better visual impact
+    String line1 = "Auto";
+    String line2 = "Tared!";
+    
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    
+    // Get text bounds for both lines
+    display->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    display->getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    
+    // Calculate centered positions - tighter spacing for size 2 text
+    int centerX1 = (SCREEN_WIDTH - w1) / 2;
+    int centerX2 = (SCREEN_WIDTH - w2) / 2;
+    
+    // Position lines closer together to fit in 32 pixels
+    int line1Y = 0;  // Start at top
+    int line2Y = 16; // Second line at pixel 16
+    
+    // Display first line
+    display->setCursor(centerX1, line1Y);
+    display->print(line1);
+    
+    // Display second line
+    display->setCursor(centerX2, line2Y);
+    display->print(line2);
+    
+    display->display();
+}
+
 void Display::clearMessageState() {
     showingMessage = false;
     currentMessage = "";
@@ -515,20 +559,18 @@ void Display::drawWeight(float weight) {
         displayFlowRate = 0.0; // Force to exactly 0.0 to avoid negative sign
     }
     
-    // Format flow rate string with consistent spacing
-    String flowRateStr = "Flow Rate: ";
+    // Format flow rate string with consistent spacing (shorter format like Auto mode)
+    String flowRateStr = "FR: ";
     if (displayFlowRate < 0) {
         flowRateStr += String(displayFlowRate, 1); // Keep negative sign for values below -0.1g/s
     } else {
-        flowRateStr += " " + String(displayFlowRate, 1); // Add space where negative sign would be
+        flowRateStr += String(displayFlowRate, 1); // No extra space needed for shorter format
     }
     flowRateStr += "g/s";
     
-    // Small flow rate text at bottom - centered
+    // Small flow rate text at bottom left (same as Auto mode)
     display->setTextSize(1);
-    display->getTextBounds(flowRateStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
-    int flowRateCenterX = (SCREEN_WIDTH - textWidth) / 2;
-    display->setCursor(flowRateCenterX, 24);
+    display->setCursor(0, 24);
     display->print(flowRateStr);
     
     display->display();
@@ -565,9 +607,9 @@ void Display::showWeightWithTimer(float weight) {
     display->setCursor(centerX, 0);
     display->print(weightStr);
     
-    // Show timer instead of flow rate
-    unsigned long currentTime = getTimerSeconds();
-    String timerStr = "Timer: " + String(currentTime) + "s";
+    // Show timer instead of flow rate with decimal precision
+    float currentTime = getTimerSeconds();
+    String timerStr = "Timer: " + String(currentTime, 1) + "s";
     
     // Small timer text at bottom - centered
     display->setTextSize(1);
@@ -579,10 +621,96 @@ void Display::showWeightWithTimer(float weight) {
     display->display();
 }
 
+void Display::showWeightWithFlowAndTimer(float weight) {
+    // Don't run auto-tare checks if we're showing a message
+    if (!showingMessage) {
+        checkAutoTare(weight);
+    }
+    
+    // If we're showing a message, don't override it with weight display
+    if (showingMessage) {
+        return;
+    }
+    
+    display->clearDisplay();
+    
+    // Apply deadband to prevent flickering between 0.0g and -0.0g
+    float displayWeight = weight;
+    if (weight >= -0.1 && weight <= 0.1) {
+        displayWeight = 0.0;
+    }
+    
+    // Format weight string with consistent spacing
+    String weightStr;
+    if (displayWeight < 0) {
+        weightStr = String(displayWeight, 1);
+    } else {
+        weightStr = " " + String(displayWeight, 1);
+    }
+    weightStr += "g";
+    
+    // Calculate text width for centering weight
+    display->setTextSize(2);
+    int16_t x1, y1;
+    uint16_t textWidth, textHeight;
+    display->getTextBounds(weightStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    
+    // Center the weight text horizontally
+    int centerX = (SCREEN_WIDTH - textWidth) / 2;
+    
+    // Large weight display - centered at top
+    display->setCursor(centerX, 0);
+    display->print(weightStr);
+    
+    // Get flow rate and format it for left side
+    float currentFlowRate = 0.0;
+    if (flowRatePtr != nullptr) {
+        currentFlowRate = flowRatePtr->getFlowRate();
+    }
+    
+    // Auto timer functionality - check flow rate changes
+    checkAutoTimer(currentFlowRate);
+    
+    // Apply deadband to flow rate
+    float displayFlowRate = currentFlowRate;
+    if (currentFlowRate >= -0.1 && currentFlowRate <= 0.1) {
+        displayFlowRate = 0.0;
+    }
+    
+    // Format flow rate string (shorter format for space)
+    String flowRateStr = "FR: ";
+    if (displayFlowRate < 0) {
+        flowRateStr += String(displayFlowRate, 1);
+    } else {
+        flowRateStr += String(displayFlowRate, 1);
+    }
+    flowRateStr += "g/s";
+    
+    // Get timer for right side
+    float currentTime = getTimerSeconds();
+    String timerStr = String(currentTime, 1) + "s";
+    
+    // Small text at bottom - flow rate on left, timer on right
+    display->setTextSize(1);
+    
+    // Flow rate on bottom left
+    display->setCursor(0, 24);
+    display->print(flowRateStr);
+    
+    // Timer on bottom right
+    display->getTextBounds(timerStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
+    int timerX = SCREEN_WIDTH - textWidth;
+    display->setCursor(timerX, 24);
+    display->print(timerStr);
+    
+    display->display();
+}
+
 void Display::showModeMessage(ScaleMode mode) {
     // Set message state to prevent weight display interference
     currentMessage = "Mode change message";
     messageStartTime = millis();
+    messageDuration = 1000; // Show for 1 second (reduced from default 2 seconds)
     showingMessage = true;
     
     // Show mode name in same format as WeighMyBru Ready
@@ -636,6 +764,17 @@ void Display::showModeMessage(ScaleMode mode) {
 // Mode management methods
 void Display::setMode(ScaleMode mode) {
     currentMode = mode;
+    
+    // Reset auto mode variables when switching to AUTO mode
+    if (mode == ScaleMode::AUTO) {
+        autoTareEnabled = true;
+        waitingForStabilization = false;
+        autoTimerStarted = false;
+        lastWeight = 0.0;
+        lastFlowRate = 0.0;
+        Serial.println("Auto mode activated - auto-tare and auto-timer enabled");
+    }
+    
     showModeMessage(mode); // Show mode change message
 }
 
@@ -684,12 +823,96 @@ bool Display::isTimerRunning() const {
     return timerRunning && !timerPaused;
 }
 
-unsigned long Display::getTimerSeconds() const {
+float Display::getTimerSeconds() const {
     if (!timerRunning) {
-        return 0;
+        return 0.0;
     } else if (timerPaused) {
-        return timerPausedTime / 1000;
+        return timerPausedTime / 1000.0;
     } else {
-        return (millis() - timerStartTime) / 1000;
+        return (millis() - timerStartTime) / 1000.0;
+    }
+}
+
+void Display::checkAutoTare(float weight) {
+    if (!autoTareEnabled) return;
+    
+    unsigned long currentTime = millis();
+    float weightChange = abs(weight - lastWeight);
+    
+    // Detect significant weight change (more than 5g) - cup placed
+    if (weightChange > 5.0 && !waitingForStabilization) {
+        waitingForStabilization = true;
+        weightWhenChanged = weight;
+        stabilizationStartTime = currentTime;
+        lastWeightChangeTime = currentTime;
+        Serial.println("Cup detected - waiting for weight to stabilize...");
+    }
+    
+    // Check if weight is stabilizing
+    if (waitingForStabilization) {
+        float currentChange = abs(weight - weightWhenChanged);
+        
+        // If weight changed significantly from when we started waiting, reset timer
+        if (currentChange > 1.0) { // Reduced from 2.0g to 1.0g for faster detection
+            weightWhenChanged = weight;
+            stabilizationStartTime = currentTime;
+        }
+        // If weight has been stable for 1 second, auto-tare (reduced from 2 seconds)
+        else if (currentTime - stabilizationStartTime > 1000) {
+            if (scalePtr != nullptr) {
+                scalePtr->tare();
+                Serial.println("Auto-tare executed - cup weight zeroed");
+                showAutoTaredMessage(); // Use dedicated method
+            }
+            waitingForStabilization = false;
+            autoTareEnabled = false; // Disable auto-tare, now ready for timer
+            Serial.println("Auto-tare complete - auto-timer now enabled");
+        }
+    }
+    
+    lastWeight = weight;
+}
+
+void Display::checkAutoTimer(float flowRate) {
+    // Only allow auto-timer to start if auto-tare has been completed
+    // This prevents timer from starting when placing a cup on the scale
+    if (!autoTareEnabled && !waitingForStabilization) {
+        // Start timer when flow rate increases above threshold (0.2g/s)
+        if (!timerRunning && !autoTimerStarted && flowRate > 0.2) {
+            startTimer();
+            autoTimerStarted = true;
+            Serial.println("Auto-timer started - coffee flow detected");
+        }
+        
+        // Pause timer immediately when flow rate drops to 0.0
+        if (timerRunning && autoTimerStarted) {
+            if (flowRate <= 0.0) {
+                stopTimer();
+                Serial.println("Auto-timer paused - coffee flow stopped (0.0g/s)");
+            } else if (timerPaused && flowRate > 0.1) {
+                // Resume timer if flow picks up again
+                startTimer();
+                Serial.println("Auto-timer resumed - coffee flow detected again");
+            }
+        }
+    }
+    
+    lastFlowRate = flowRate;
+}
+
+void Display::resetAutoSequence() {
+    if (currentMode == ScaleMode::AUTO) {
+        autoTareEnabled = true;
+        waitingForStabilization = false;
+        autoTimerStarted = false;
+        lastWeight = 0.0;
+        lastFlowRate = 0.0;
+        
+        // Reset timer if it was auto-started
+        if (timerRunning && autoTimerStarted) {
+            resetTimer();
+        }
+        
+        Serial.println("Auto sequence reset - ready for new auto-tare cycle");
     }
 }

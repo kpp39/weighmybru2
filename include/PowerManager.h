@@ -40,6 +40,7 @@ private:
         PAUSED = 2
     };
     TimerState timerState;
+    unsigned long lastTimerControlTime;
     
     void handleSleepTouch();
     void showSleepCountdown(int seconds);

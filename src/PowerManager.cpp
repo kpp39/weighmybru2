@@ -4,9 +4,9 @@
 PowerManager::PowerManager(uint8_t sleepTouchPin, Display* display) 
     : sleepTouchPin(sleepTouchPin), displayPtr(display), sleepTouchThreshold(0),
       lastSleepTouchState(false), lastSleepTouchTime(0), touchStartTime(0),
-      debounceDelay(50), sleepCountdownStart(0), sleepCountdownActive(false),
+      debounceDelay(200), sleepCountdownStart(0), sleepCountdownActive(false),
       longPressDetected(false), cancelledRecently(false), cancelTime(0),
-      timerState(TimerState::STOPPED) {
+      timerState(TimerState::STOPPED), lastTimerControlTime(0) {
 }
 
 void PowerManager::begin() {
@@ -68,11 +68,13 @@ void PowerManager::update() {
                     }
                 } else if (!cancelledRecently) {
                     // Check current mode to determine behavior
-                    if (displayPtr != nullptr && displayPtr->getMode() == ScaleMode::TIME) {
-                        // In TIME mode - handle timer control with short press
-                        handleTimerControl();
+                    if (displayPtr != nullptr && (displayPtr->getMode() == ScaleMode::TIME || displayPtr->getMode() == ScaleMode::AUTO)) {
+                        // In TIME or AUTO mode - just record touch start time, handle timer on release
+                        touchStartTime = currentTime;
+                        longPressDetected = false;
+                        Serial.println("Timer control touch started");
                     } else {
-                        // In other modes - start timing for long press (sleep functionality)
+                        // In FLOW mode - start timing for long press (sleep functionality)
                         touchStartTime = currentTime;
                         longPressDetected = false;
                         Serial.println("Sleep touch started");
@@ -81,11 +83,11 @@ void PowerManager::update() {
             } else {
                 // Touch ended
                 if (!sleepCountdownActive && !longPressDetected && !cancelledRecently) {
-                    // Check if we're in TIME mode for timer control
-                    if (displayPtr != nullptr && displayPtr->getMode() == ScaleMode::TIME) {
+                    // Check if we're in TIME or AUTO mode for timer control
+                    if (displayPtr != nullptr && (displayPtr->getMode() == ScaleMode::TIME || displayPtr->getMode() == ScaleMode::AUTO)) {
                         handleTimerControl();
                     } else {
-                        Serial.println("Sleep touch released (short press - no action in FLOW/AUTO mode)");
+                        Serial.println("Sleep touch released (short press - no action in FLOW mode)");
                     }
                 }
                 // Don't reset longPressDetected here if countdown is active
@@ -98,14 +100,11 @@ void PowerManager::update() {
         }
     }
     
-    // Check for long press (1 second) - only if not already in countdown, not recently cancelled, and not in TIME mode
+    // Check for long press (1 second) - works in all modes for sleep functionality
     if (currentSleepTouchState && !longPressDetected && !sleepCountdownActive && !cancelledRecently) {
-        // Only check for long press if not in TIME mode (TIME mode uses short presses for timer control)
-        if (displayPtr == nullptr || displayPtr->getMode() != ScaleMode::TIME) {
-            if (currentTime - touchStartTime >= 1000) {
-                longPressDetected = true;
-                handleSleepTouch();
-            }
+        if (currentTime - touchStartTime >= 1000) {
+            longPressDetected = true;
+            handleSleepTouch();
         }
     }
 }
@@ -164,6 +163,14 @@ void PowerManager::showSleepCountdown(int seconds) {
 void PowerManager::handleTimerControl() {
     if (displayPtr == nullptr) return;
     
+    // Prevent rapid successive timer control actions (minimum 300ms between actions)
+    unsigned long currentTime = millis();
+    if (currentTime - lastTimerControlTime < 300) {
+        Serial.println("Timer control ignored - too soon after last action");
+        return;
+    }
+    
+    lastTimerControlTime = currentTime;
     Serial.println("Timer control triggered");
     
     switch (timerState) {

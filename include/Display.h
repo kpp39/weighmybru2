@@ -27,6 +27,7 @@ public:
     void showSleepCancelledMessage(); // Show "Sleep / Cancelled" message like WeighMyBru Ready
     void showTaringMessage(); // Show "Taring..." message like WeighMyBru Ready
     void showTaredMessage(); // Show "Tared!" message like WeighMyBru Ready
+    void showAutoTaredMessage(); // Show "Auto Tared!" message like WeighMyBru Ready
     void showModeMessage(ScaleMode mode); // Show mode name like WeighMyBru Ready
     void clearMessageState(); // Clear message state to return to weight display
     void showIPAddresses(); // Show WiFi IP addresses
@@ -43,7 +44,12 @@ public:
     void stopTimer();
     void resetTimer();
     bool isTimerRunning() const;
-    unsigned long getTimerSeconds() const;
+    float getTimerSeconds() const;
+    
+    // Auto mode functionality
+    void checkAutoTare(float weight);
+    void checkAutoTimer(float flowRate);
+    void resetAutoSequence(); // Reset auto mode sequence when manually tared
     
 private:
     uint8_t sdaPin;
@@ -58,6 +64,7 @@ private:
     static const uint8_t SCREEN_ADDRESS = 0x3C; // Common I2C address for SSD1306
     
     unsigned long messageStartTime;
+    int messageDuration; // Store the duration for each message
     bool showingMessage;
     String currentMessage;
     
@@ -70,8 +77,19 @@ private:
     bool timerRunning;
     bool timerPaused;
     
+    // Auto mode system
+    float lastWeight;
+    unsigned long lastWeightChangeTime;
+    bool waitingForStabilization;
+    float weightWhenChanged;
+    unsigned long stabilizationStartTime;
+    bool autoTareEnabled;
+    float lastFlowRate;
+    bool autoTimerStarted;
+    
     void drawWeight(float weight);
     void showWeightWithTimer(float weight); // For TIME mode display
+    void showWeightWithFlowAndTimer(float weight); // For AUTO mode display
     void setupDisplay();
 };
 
