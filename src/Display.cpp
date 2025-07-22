@@ -1,10 +1,11 @@
 #include "Display.h"
 #include "Scale.h"
 #include "FlowRate.h"
+#include "BluetoothScale.h"
 #include <WiFi.h>
 
 Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate)
-    : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate),
+    : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate), bluetoothPtr(nullptr),
       messageStartTime(0), messageDuration(2000), showingMessage(false), currentMode(ScaleMode::FLOW),
       timerStartTime(0), timerPausedTime(0), timerRunning(false), timerPaused(false),
       lastWeight(0.0), lastWeightChangeTime(0), waitingForStabilization(false),
@@ -514,6 +515,20 @@ void Display::setBrightness(uint8_t brightness) {
     display->ssd1306_command(brightness);
 }
 
+void Display::setBluetoothScale(BluetoothScale* bluetooth) {
+    bluetoothPtr = bluetooth;
+}
+
+void Display::drawBluetoothStatus() {
+    // Only draw if we have a bluetooth instance and it's connected
+    if (bluetoothPtr && bluetoothPtr->isConnected()) {
+        // Draw a small "BT" in the top-right corner
+        display->setTextSize(1);
+        display->setCursor(108, 0); // Position at top-right (128-20=108 pixels from left)
+        display->print("BT");
+    }
+}
+
 void Display::drawWeight(float weight) {
     display->clearDisplay();
     
@@ -573,6 +588,9 @@ void Display::drawWeight(float weight) {
     display->setCursor(0, 24);
     display->print(flowRateStr);
     
+    // Draw Bluetooth status if connected
+    drawBluetoothStatus();
+    
     display->display();
 }
 
@@ -617,6 +635,9 @@ void Display::showWeightWithTimer(float weight) {
     int timerCenterX = (SCREEN_WIDTH - textWidth) / 2;
     display->setCursor(timerCenterX, 24);
     display->print(timerStr);
+    
+    // Draw Bluetooth status if connected
+    drawBluetoothStatus();
     
     display->display();
 }
@@ -697,11 +718,18 @@ void Display::showWeightWithFlowAndTimer(float weight) {
     display->setCursor(0, 24);
     display->print(flowRateStr);
     
-    // Timer on bottom right
+    // Timer on bottom right (adjusted for Bluetooth indicator if present)
     display->getTextBounds(timerStr, 0, 0, &x1, &y1, &textWidth, &textHeight);
     int timerX = SCREEN_WIDTH - textWidth;
+    // If Bluetooth is connected, move timer left a bit to avoid overlap
+    if (bluetoothPtr && bluetoothPtr->isConnected()) {
+        timerX -= 25; // Move 25 pixels left to avoid "BT" text
+    }
     display->setCursor(timerX, 24);
     display->print(timerStr);
+    
+    // Draw Bluetooth status if connected
+    drawBluetoothStatus();
     
     display->display();
 }

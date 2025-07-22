@@ -7,6 +7,7 @@
 
 class Scale; // Forward declaration
 class FlowRate; // Forward declaration
+class BluetoothScale; // Forward declaration
 
 enum class ScaleMode {
     FLOW = 0,
@@ -34,6 +35,9 @@ public:
     void clear();
     void setBrightness(uint8_t brightness);
     
+    // Bluetooth connection status
+    void setBluetoothScale(BluetoothScale* bluetooth);
+    
     // Mode management
     void setMode(ScaleMode mode);
     ScaleMode getMode() const;
@@ -56,6 +60,7 @@ private:
     uint8_t sclPin;
     Scale* scalePtr;
     FlowRate* flowRatePtr;
+    BluetoothScale* bluetoothPtr;
     Adafruit_SSD1306* display;
     
     static const uint8_t SCREEN_WIDTH = 128;
@@ -91,6 +96,7 @@ private:
     void showWeightWithTimer(float weight); // For TIME mode display
     void showWeightWithFlowAndTimer(float weight); // For AUTO mode display
     void setupDisplay();
+    void drawBluetoothStatus(); // Draw Bluetooth connection status icon
 };
 
 #endif

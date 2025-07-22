@@ -67,6 +67,9 @@ void setup() {
   
   // Initialize Bluetooth scale
   bluetoothScale.begin(&scale);
+  
+  // Set bluetooth reference in display for status indicator
+  oledDisplay.setBluetoothScale(&bluetoothScale);
 
   // Initialize touch sensor
   touchSensor.begin();
