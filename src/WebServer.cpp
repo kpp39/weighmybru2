@@ -241,6 +241,54 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
     request->send(200, "application/json", json);
   });
 
+  // Filter settings API endpoints
+  server.on("/api/filter-settings", HTTP_GET, [&scale](AsyncWebServerRequest *request) {
+    String json = "{";
+    json += "\"brewingThreshold\":" + String(scale.getBrewingThreshold(), 2) + ",";
+    json += "\"stabilityTimeout\":" + String(scale.getStabilityTimeout()) + ",";
+    json += "\"medianSamples\":" + String(scale.getMedianSamples()) + ",";
+    json += "\"averageSamples\":" + String(scale.getAverageSamples());
+    json += "}";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/api/filter-settings", HTTP_POST, [&scale](AsyncWebServerRequest *request) {
+    String response = "{\"status\":\"success\",\"message\":\"";
+    bool updated = false;
+    
+    if (request->hasParam("brewingThreshold", true)) {
+      float threshold = request->getParam("brewingThreshold", true)->value().toFloat();
+      scale.setBrewingThreshold(threshold);
+      response += "Brewing threshold updated. ";
+      updated = true;
+    }
+    if (request->hasParam("stabilityTimeout", true)) {
+      unsigned long timeout = request->getParam("stabilityTimeout", true)->value().toInt();
+      scale.setStabilityTimeout(timeout);
+      response += "Stability timeout updated. ";
+      updated = true;
+    }
+    if (request->hasParam("medianSamples", true)) {
+      int samples = request->getParam("medianSamples", true)->value().toInt();
+      scale.setMedianSamples(samples);
+      response += "Median samples updated. ";
+      updated = true;
+    }
+    if (request->hasParam("averageSamples", true)) {
+      int samples = request->getParam("averageSamples", true)->value().toInt();
+      scale.setAverageSamples(samples);
+      response += "Average samples updated. ";
+      updated = true;
+    }
+    
+    if (updated) {
+      response += "\"}";
+      request->send(200, "application/json", response);
+    } else {
+      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"No valid parameters provided\"}");
+    }
+  });
+
   // Combined settings endpoint for faster loading
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
     // Get WiFi credentials (from cache)
