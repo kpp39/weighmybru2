@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLOWRATE_AVG_WINDOW 12  // Reduced for faster response
+#define FLOWRATE_AVG_WINDOW 20  // Increased for better smoothing
 
 class FlowRate {
 public:
@@ -16,12 +16,12 @@ private:
     int bufferCount;
     
     // Flow rate filtering parameters
-    static constexpr float WEIGHT_DEADBAND = 0.05f;     // Ignore changes smaller than 0.05g
-    static constexpr float MIN_DELTA_TIME = 0.08f;      // Increased to 80ms for more stable readings
-    static constexpr float ZERO_THRESHOLD = 0.05f;      // Clamp to zero if flow rate < 0.05 g/s
-    static constexpr float RAPID_CHANGE_THRESHOLD = 1.0f; // Increased to 1.0g - only for major changes
-    static constexpr float NEGATIVE_CHANGE_THRESHOLD = 0.3f; // Lower threshold for weight removal detection
+    static constexpr float WEIGHT_DEADBAND = 0.08f;     // Increased deadband for load cell noise
+    static constexpr float MIN_DELTA_TIME = 0.15f;      // Increased to 150ms for much more stable readings
+    static constexpr float ZERO_THRESHOLD = 0.08f;      // Increased zero threshold
+    static constexpr float RAPID_CHANGE_THRESHOLD = 1.5f; // Higher threshold for major changes
+    static constexpr float NEGATIVE_CHANGE_THRESHOLD = 0.5f; // Higher threshold for weight removal
     
     // Helper methods
-    float calculateAdaptiveAverage(bool rapidChange);
+    float calculateStableAverage(bool isWeightRemoval);
 };

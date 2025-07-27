@@ -15,12 +15,11 @@ void FlowRate::update(float currentWeight) {
         
         // Only update if enough time has passed for meaningful calculation
         if (deltaTime >= MIN_DELTA_TIME) {
-            // Detect different types of changes
+            // Detect different types of changes with higher thresholds
             bool majorWeightIncrease = deltaWeight > RAPID_CHANGE_THRESHOLD;
             bool weightRemoval = deltaWeight < -NEGATIVE_CHANGE_THRESHOLD;
-            bool rapidChange = majorWeightIncrease || weightRemoval;
             
-            // Apply deadband filter - ignore very small weight changes
+            // Apply stronger deadband filter for load cell noise
             if (abs(deltaWeight) < WEIGHT_DEADBAND) {
                 deltaWeight = 0.0f;
             }
@@ -28,9 +27,9 @@ void FlowRate::update(float currentWeight) {
             if (deltaTime > 0) {
                 float instantRate = deltaWeight / deltaTime;
                 
-                // Only clear buffer for significant weight removal (not incremental changes)
-                if (weightRemoval && abs(deltaWeight) > 0.5f) {
-                    // Significant weight removed - reset buffer for fast zero response
+                // Only clear buffer for significant weight removal
+                if (weightRemoval && abs(deltaWeight) > 1.0f) {
+                    // Major weight removed - reset buffer for fast zero response
                     for (int i = 0; i < FLOWRATE_AVG_WINDOW; i++) {
                         flowRateBuffer[i] = 0.0f;
                     }
@@ -44,8 +43,8 @@ void FlowRate::update(float currentWeight) {
                     if (bufferCount < FLOWRATE_AVG_WINDOW) bufferCount++;
                 }
                 
-                // Calculate adaptive average - only use fast mode for weight removal
-                flowRate = calculateAdaptiveAverage(weightRemoval);
+                // Calculate stable average with consistent smoothing
+                flowRate = calculateStableAverage(weightRemoval);
                 
                 // Apply zero threshold to eliminate tiny fluctuations
                 if (abs(flowRate) < ZERO_THRESHOLD) {
@@ -63,12 +62,12 @@ void FlowRate::update(float currentWeight) {
     }
 }
 
-float FlowRate::calculateAdaptiveAverage(bool isWeightRemoval) {
+float FlowRate::calculateStableAverage(bool isWeightRemoval) {
     if (bufferCount == 0) return 0.0f;
     
     if (isWeightRemoval) {
         // For weight removal, use fewer samples for faster zero response
-        int samplesToUse = min(3, bufferCount);
+        int samplesToUse = min(5, bufferCount);
         float sum = 0.0f;
         for (int i = 0; i < samplesToUse; i++) {
             int index = (bufferIndex - 1 - i + FLOWRATE_AVG_WINDOW) % FLOWRATE_AVG_WINDOW;
@@ -76,15 +75,16 @@ float FlowRate::calculateAdaptiveAverage(bool isWeightRemoval) {
         }
         return sum / samplesToUse;
     } else {
-        // Normal operation (including incremental changes) - use full weighted average for stability
+        // Normal operation - use gentle linear weighting for maximum stability
         float weightedSum = 0.0f;
         float totalWeight = 0.0f;
         
-        // Use all samples with exponential weighting for smooth flow readings
-        for (int i = 0; i < bufferCount; i++) {
+        // Use more samples with gentle linear weighting (not exponential)
+        int samplesToUse = min(bufferCount, FLOWRATE_AVG_WINDOW);
+        for (int i = 0; i < samplesToUse; i++) {
             int index = (bufferIndex - 1 - i + FLOWRATE_AVG_WINDOW) % FLOWRATE_AVG_WINDOW;
-            // Exponential decay: recent samples get much higher weight
-            float weight = exp(-0.15f * i); // Smooth exponential weighting
+            // Gentle linear weighting: recent samples slightly more important
+            float weight = 1.0f + (0.05f * (samplesToUse - i)); // Very gentle weighting
             weightedSum += flowRateBuffer[index] * weight;
             totalWeight += weight;
         }
