@@ -27,7 +27,6 @@ public:
     unsigned long getStabilityTimeout() const { return stabilityTimeout; }
     int getMedianSamples() const { return medianSamples; }
     int getAverageSamples() const { return averageSamples; }
-    bool isBrewingActive() const { return brewingActive; }  // Add method to check brewing state
     
     void saveFilterSettings();
     void loadFilterSettings();
@@ -41,19 +40,17 @@ private:
     float currentWeight;
     
     // Smart filtering variables
-    static const int MAX_SAMPLES = 50;  // Increased from 20 to support up to 50 samples
+    static const int MAX_SAMPLES = 50;
     float readings[MAX_SAMPLES];
     int readingIndex = 0;
-    float lastStableWeight = 0;
-    unsigned long lastSignificantChange = 0;
-    bool brewingActive = false;
     bool samplesInitialized = false;
+    float previousFilteredWeight = 0;
     
     // Configurable filtering parameters
-    float brewingThreshold = 0.15f;  // Adjustable based on load cell sensitivity
-    unsigned long stabilityTimeout = 2000;  // 2 seconds default
-    int medianSamples = 3;  // Samples for brewing mode (median filter)
-    int averageSamples = 5;  // Samples for stable mode (average filter)
+    float brewingThreshold = 0.15f;  // Keep for API compatibility
+    unsigned long stabilityTimeout = 2000;  // Keep for API compatibility
+    int medianSamples = 3;  // Keep for API compatibility
+    int averageSamples = 2;  // Samples for average filter - reduced for faster response
     
     // Filter methods
     float medianFilter(int samples);

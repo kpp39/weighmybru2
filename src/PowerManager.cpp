@@ -173,6 +173,20 @@ void PowerManager::handleTimerControl() {
     lastTimerControlTime = currentTime;
     Serial.println("Timer control triggered");
     
+    // Special handling for AUTO mode
+    if (displayPtr->getMode() == ScaleMode::AUTO) {
+        // In AUTO mode, power button only stops auto-started timers
+        if (displayPtr->isAutoTimerActive()) {
+            displayPtr->stopAutoTimer();
+            timerState = TimerState::PAUSED; // Sync state
+            Serial.println("Auto-timer stopped by power button");
+        } else {
+            Serial.println("Power button pressed in AUTO mode - no auto timer to stop");
+        }
+        return;
+    }
+    
+    // Normal timer control for TIME mode
     switch (timerState) {
         case TimerState::STOPPED:
             // First tap - start timer
@@ -195,4 +209,9 @@ void PowerManager::handleTimerControl() {
             Serial.println("Timer reset");
             break;
     }
+}
+
+void PowerManager::resetTimerState() {
+    timerState = TimerState::STOPPED;
+    Serial.println("PowerManager timer state reset");
 }

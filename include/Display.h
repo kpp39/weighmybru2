@@ -8,6 +8,7 @@
 class Scale; // Forward declaration
 class FlowRate; // Forward declaration
 class BluetoothScale; // Forward declaration
+class PowerManager; // Forward declaration
 
 enum class ScaleMode {
     FLOW = 0,
@@ -30,6 +31,7 @@ public:
     void showTaredMessage(); // Show "Tared!" message like WeighMyBru Ready
     void showAutoTaredMessage(); // Show "Auto Tared!" message like WeighMyBru Ready
     void showModeMessage(ScaleMode mode); // Show mode name like WeighMyBru Ready
+    void showModeMessage(ScaleMode mode, int duration); // Show mode name with custom duration
     void clearMessageState(); // Clear message state to return to weight display
     void showIPAddresses(); // Show WiFi IP addresses
     void clear();
@@ -38,10 +40,15 @@ public:
     // Bluetooth connection status
     void setBluetoothScale(BluetoothScale* bluetooth);
     
+    // Power manager reference for timer state synchronization
+    void setPowerManager(PowerManager* powerManager);
+    
     // Mode management
     void setMode(ScaleMode mode);
+    void setMode(ScaleMode mode, bool delayTare); // Overload with option to delay tare
     ScaleMode getMode() const;
     void nextMode();
+    void nextMode(bool delayTare); // Overload for mode switching with delayed tare
     
     // Timer management for TIME mode
     void startTimer();
@@ -49,6 +56,13 @@ public:
     void resetTimer();
     bool isTimerRunning() const;
     float getTimerSeconds() const;
+    
+    // Auto mode timer management
+    bool isAutoTimerActive() const; // Check if auto timer was started and is still active
+    void stopAutoTimer(); // Stop auto timer specifically (for power button control)
+    
+    // Mode switching with delayed tare
+    void completePendingModeTare(); // Complete mode tare after touch release
     
     // Auto mode functionality
     void checkAutoTare(float weight);
@@ -61,6 +75,7 @@ private:
     Scale* scalePtr;
     FlowRate* flowRatePtr;
     BluetoothScale* bluetoothPtr;
+    PowerManager* powerManagerPtr;
     Adafruit_SSD1306* display;
     
     static const uint8_t SCREEN_WIDTH = 128;
@@ -91,6 +106,18 @@ private:
     bool autoTareEnabled;
     float lastFlowRate;
     bool autoTimerStarted;
+    
+    // Mode switching system
+    bool pendingModeTare;
+    unsigned long modeSwitchTime; // Track when mode was switched
+    bool stabilizationMessageShown; // Track if we've shown the stabilization end message
+    
+    // Mode tare stabilization tracking
+    bool waitingForModeTareStabilization;
+    unsigned long modeTareStabilizationStart;
+    float lastStableWeight;
+    float fingerPressWeight; // Weight when finger was pressing (for release detection)
+    bool fingerReleaseDetected; // Track if we've detected finger release
     
     void drawWeight(float weight);
     void showWeightWithTimer(float weight); // For TIME mode display

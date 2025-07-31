@@ -31,6 +31,11 @@ void TouchSensor::update() {
                 if (!longPressDetected) {
                     // Short press - trigger tare
                     handleTouch();
+                } else {
+                    // Touch ended after long press - complete any pending mode tare
+                    if (displayPtr != nullptr) {
+                        displayPtr->completePendingModeTare();
+                    }
                 }
                 longPressDetected = false;
                 Serial.println("Touch ended");
@@ -105,8 +110,8 @@ void TouchSensor::handleLongPress() {
     Serial.println("Long press detected! Switching mode...");
     
     if (displayPtr != nullptr) {
-        displayPtr->nextMode();
-        Serial.println("Mode switched");
+        displayPtr->nextMode(true); // Use delayed tare
+        Serial.println("Mode switched with delayed tare");
     } else {
         Serial.println("Error: Display pointer is null");
     }

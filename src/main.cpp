@@ -70,6 +70,9 @@ void setup() {
   
   // Set bluetooth reference in display for status indicator
   oledDisplay.setBluetoothScale(&bluetoothScale);
+  
+  // Set power manager reference in display for timer state synchronization
+  oledDisplay.setPowerManager(&powerManager);
 
   // Initialize touch sensor
   touchSensor.begin();

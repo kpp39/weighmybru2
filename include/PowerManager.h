@@ -18,6 +18,7 @@ public:
     
     // Timer control for TIME mode
     void handleTimerControl();
+    void resetTimerState(); // Reset timer state to sync with auto mode
     
 private:
     uint8_t sleepTouchPin;

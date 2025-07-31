@@ -4,8 +4,7 @@
 
 Scale::Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor)
     : dataPin(dataPin), clockPin(clockPin), calibrationFactor(calibrationFactor), currentWeight(0.0f),
-      readingIndex(0), lastStableWeight(0), lastSignificantChange(0), brewingActive(false), samplesInitialized(false),
-      medianSamples(3), averageSamples(5) {
+      readingIndex(0), samplesInitialized(false), previousFilteredWeight(0), medianSamples(3), averageSamples(2) {
     // Initialize readings array
     for (int i = 0; i < MAX_SAMPLES; i++) {
         readings[i] = 0.0f;
@@ -75,15 +74,12 @@ void Scale::loadCalibration() {
 }
 
 float Scale::getWeight() {
-    // Reduce reading frequency when stable to minimize noise
     static unsigned long lastReadTime = 0;
     unsigned long currentTime = millis();
     
-    // Adaptive reading frequency: faster when brewing, slower when stable
-    unsigned long readInterval = brewingActive ? 10 : 50; // 10ms when brewing, 50ms when stable
-    
-    if (currentTime - lastReadTime < readInterval) {
-        return currentWeight; // Return cached weight if reading too frequently
+    // Read at 50Hz (every 20ms) for good responsiveness
+    if (currentTime - lastReadTime < 20) {
+        return currentWeight;
     }
     lastReadTime = currentTime;
     
@@ -91,41 +87,22 @@ float Scale::getWeight() {
     
     // Handle NaN or invalid readings
     if (isnan(rawReading)) {
-        return currentWeight; // Return last known good weight
+        return currentWeight;
     }
     
     // Initialize sample buffer on first valid reading
     if (!samplesInitialized) {
         initializeSamples(rawReading);
         currentWeight = rawReading;
-        lastStableWeight = rawReading;
         return currentWeight;
-    }
-    
-    // Detect if we're actively brewing (significant weight change)
-    float weightChange = abs(rawReading - lastStableWeight);
-    if (weightChange > brewingThreshold) {
-        brewingActive = true;
-        lastSignificantChange = millis();
-    } else if (millis() - lastSignificantChange > stabilityTimeout) {
-        brewingActive = false;
-        lastStableWeight = rawReading;
     }
     
     // Store reading in circular buffer
     readings[readingIndex] = rawReading;
     readingIndex = (readingIndex + 1) % MAX_SAMPLES;
     
-    float filteredWeight;
-    if (brewingActive) {
-        // During brewing: Use median filter (fast + noise resistant)
-        filteredWeight = medianFilter(medianSamples);
-    } else {
-        // When stable: Use average filter (smooth + stable)
-        filteredWeight = averageFilter(averageSamples);
-    }
-    
-    currentWeight = filteredWeight;
+    // Simple average filter for stability
+    currentWeight = averageFilter(averageSamples);
     return currentWeight;
 }
 
@@ -173,25 +150,14 @@ float Scale::averageFilter(int samples) {
     float sum = 0;
     int validSamples = 0;
     
-    // Calculate average but also apply additional smoothing for very stable readings
+    // Calculate average of recent samples
     for (int i = 0; i < samples; i++) {
         int idx = (readingIndex - 1 - i + MAX_SAMPLES) % MAX_SAMPLES;
         sum += readings[idx];
         validSamples++;
     }
     
-    float average = sum / validSamples;
-    
-    // Apply additional smoothing when in stable mode with high sample count
-    if (samples >= 30 && !brewingActive) {
-        // For very stable readings, apply extra smoothing to reduce micro-fluctuations
-        static float previousStableReading = average;
-        float smoothingFactor = 0.1f; // Stronger smoothing for high sample counts
-        average = previousStableReading * (1.0f - smoothingFactor) + average * smoothingFactor;
-        previousStableReading = average;
-    }
-    
-    return average;
+    return sum / validSamples; // Return simple average without additional smoothing
 }
 
 // Filter parameter setters with validation
@@ -238,5 +204,5 @@ void Scale::loadFilterSettings() {
     brewingThreshold = preferences.getFloat("brew_thresh", 0.15f);
     stabilityTimeout = preferences.getULong("stab_timeout", 2000);
     medianSamples = preferences.getInt("median_samples", 3);
-    averageSamples = preferences.getInt("avg_samples", 5);
+    averageSamples = preferences.getInt("avg_samples", 2); // Reduced for faster response
 }

@@ -2,15 +2,18 @@
 #include "Scale.h"
 #include "FlowRate.h"
 #include "BluetoothScale.h"
+#include "PowerManager.h"
 #include <WiFi.h>
 
 Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate)
-    : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate), bluetoothPtr(nullptr),
+    : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate), bluetoothPtr(nullptr), powerManagerPtr(nullptr),
       messageStartTime(0), messageDuration(2000), showingMessage(false), currentMode(ScaleMode::FLOW),
       timerStartTime(0), timerPausedTime(0), timerRunning(false), timerPaused(false),
       lastWeight(0.0), lastWeightChangeTime(0), waitingForStabilization(false),
       weightWhenChanged(0.0), stabilizationStartTime(0), autoTareEnabled(true),
-      lastFlowRate(0.0), autoTimerStarted(false) {
+      lastFlowRate(0.0), autoTimerStarted(false), pendingModeTare(false), modeSwitchTime(0), stabilizationMessageShown(false),
+      waitingForModeTareStabilization(false), modeTareStabilizationStart(0), lastStableWeight(0.0), 
+      fingerPressWeight(0.0), fingerReleaseDetected(false) {
     display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 }
 
@@ -77,6 +80,41 @@ void Display::update() {
             showingMessage = false;
         } else {
             return; // Keep showing the message
+        }
+    }
+    
+    // Handle mode tare stabilization monitoring (two-stage process)
+    if (waitingForModeTareStabilization && scalePtr != nullptr) {
+        unsigned long currentTime = millis();
+        float currentWeight = scalePtr->getCurrentWeight();
+        
+        if (!fingerReleaseDetected) {
+            // Stage 1: Wait for finger release (weight drops significantly)
+            float weightDrop = fingerPressWeight - currentWeight;
+            if (weightDrop >= 0.5f) { // FINGER_RELEASE_THRESHOLD
+                fingerReleaseDetected = true;
+                modeTareStabilizationStart = currentTime;
+                lastStableWeight = currentWeight;
+                Serial.println("Finger release detected (weight dropped " + String(weightDrop) + "g), starting stabilization timer");
+            }
+        } else {
+            // Stage 2: Wait for stabilization after finger release
+            float weightChange = fabs(currentWeight - lastStableWeight);
+            if (weightChange < 0.05f) { // Tighter tolerance for final stabilization (0.05g)
+                if (currentTime - modeTareStabilizationStart >= 400) { // MODE_TARE_STABILIZATION_TIME
+                    // Weight has been stable long enough after finger release - perform tare
+                    scalePtr->tare();
+                    waitingForModeTareStabilization = false;
+                    fingerReleaseDetected = false;
+                    modeSwitchTime = millis(); // Reset mode switch time
+                    stabilizationMessageShown = false;
+                    Serial.println("Mode tare completed after finger release and stabilization");
+                }
+            } else {
+                // Weight changed - reset stabilization timer
+                modeTareStabilizationStart = currentTime;
+                lastStableWeight = currentWeight;
+            }
         }
     }
     
@@ -519,6 +557,10 @@ void Display::setBluetoothScale(BluetoothScale* bluetooth) {
     bluetoothPtr = bluetooth;
 }
 
+void Display::setPowerManager(PowerManager* powerManager) {
+    powerManagerPtr = powerManager;
+}
+
 void Display::drawBluetoothStatus() {
     // Only draw if we have a bluetooth instance and it's connected
     if (bluetoothPtr && bluetoothPtr->isConnected()) {
@@ -735,10 +777,14 @@ void Display::showWeightWithFlowAndTimer(float weight) {
 }
 
 void Display::showModeMessage(ScaleMode mode) {
+    showModeMessage(mode, 1000); // Default 1 second duration
+}
+
+void Display::showModeMessage(ScaleMode mode, int duration) {
     // Set message state to prevent weight display interference
     currentMessage = "Mode change message";
     messageStartTime = millis();
-    messageDuration = 1000; // Show for 1 second (reduced from default 2 seconds)
+    messageDuration = duration;
     showingMessage = true;
     
     // Show mode name in same format as WeighMyBru Ready
@@ -791,19 +837,40 @@ void Display::showModeMessage(ScaleMode mode) {
 
 // Mode management methods
 void Display::setMode(ScaleMode mode) {
-    currentMode = mode;
-    
-    // Reset auto mode variables when switching to AUTO mode
-    if (mode == ScaleMode::AUTO) {
-        autoTareEnabled = true;
-        waitingForStabilization = false;
-        autoTimerStarted = false;
-        lastWeight = 0.0;
-        lastFlowRate = 0.0;
-        Serial.println("Auto mode activated - auto-tare and auto-timer enabled");
+    setMode(mode, false); // Default behavior - immediate tare
+}
+
+void Display::setMode(ScaleMode mode, bool delayTare) {
+    if (currentMode != mode) {
+        currentMode = mode;
+        modeSwitchTime = millis(); // Record when mode was switched
+        
+        if (delayTare) {
+            // Mark that we need to tare after touch release
+            pendingModeTare = true;
+            Serial.println("Mode switched - tare pending until touch release");
+        } else {
+            // Auto-tare the scale immediately when switching modes (silent - no message)
+            if (scalePtr != nullptr) {
+                scalePtr->tare();
+            }
+        }
+        
+        // Reset timer for all modes to start fresh
+        resetTimer();
+        
+        // Reset auto mode variables when switching to AUTO mode
+        if (mode == ScaleMode::AUTO) {
+            autoTareEnabled = true;
+            waitingForStabilization = false;
+            autoTimerStarted = false;
+            lastWeight = 0.0;
+            lastFlowRate = 0.0;
+            Serial.println("Auto mode activated - auto-tare and auto-timer enabled");
+        }
+        
+        showModeMessage(mode, delayTare ? 2500 : 1000); // Longer duration for delayed tare (2.5 seconds)
     }
-    
-    showModeMessage(mode); // Show mode change message
 }
 
 ScaleMode Display::getMode() const {
@@ -811,15 +878,19 @@ ScaleMode Display::getMode() const {
 }
 
 void Display::nextMode() {
+    nextMode(false); // Default behavior - immediate tare
+}
+
+void Display::nextMode(bool delayTare) {
     switch (currentMode) {
         case ScaleMode::FLOW:
-            setMode(ScaleMode::TIME);
+            setMode(ScaleMode::TIME, delayTare);
             break;
         case ScaleMode::TIME:
-            setMode(ScaleMode::AUTO);
+            setMode(ScaleMode::AUTO, delayTare);
             break;
         case ScaleMode::AUTO:
-            setMode(ScaleMode::FLOW);
+            setMode(ScaleMode::FLOW, delayTare);
             break;
     }
 }
@@ -861,19 +932,69 @@ float Display::getTimerSeconds() const {
     }
 }
 
+bool Display::isAutoTimerActive() const {
+    return autoTimerStarted && timerRunning;
+}
+
+void Display::stopAutoTimer() {
+    if (autoTimerStarted && timerRunning) {
+        stopTimer();
+        Serial.println("Auto-timer stopped by power button");
+    }
+}
+
+void Display::completePendingModeTare() {
+    if (pendingModeTare) {
+        // Start the two-stage stabilization monitoring process
+        // Stage 1: Wait for finger release detection
+        waitingForModeTareStabilization = true;
+        fingerReleaseDetected = false;
+        if (scalePtr != nullptr) {
+            fingerPressWeight = scalePtr->getCurrentWeight(); // Record weight with finger on scale
+        }
+        pendingModeTare = false;
+        Serial.println("Started mode tare: waiting for finger release (current weight: " + String(fingerPressWeight) + "g)");
+    }
+}
+
 void Display::checkAutoTare(float weight) {
-    if (!autoTareEnabled) return;
+    if (!autoTareEnabled) {
+        // Check for cup removal when auto-timer is active
+        if (autoTimerStarted && timerRunning && weight < 2.0) { // Cup removed (weight < 2g threshold)
+            resetAutoSequence();
+            Serial.println("Cup removed detected - auto-timer stopped and sequence reset");
+            return;
+        }
+        return;
+    }
     
     unsigned long currentTime = millis();
-    float weightChange = abs(weight - lastWeight);
     
-    // Detect significant weight change (more than 5g) - cup placed
-    if (weightChange > 5.0 && !waitingForStabilization) {
+    // Don't start auto-tare detection for 5 seconds after mode switch
+    // This prevents false triggers from weight changes during mode switching
+    if (currentTime - modeSwitchTime < 5000) {
+        lastWeight = weight; // Update lastWeight to prevent false detection later
+        return;
+    } else {
+        // Show debug message only once when stabilization period ends
+        if (!stabilizationMessageShown) {
+            Serial.println("Auto-tare detection now active - looking for cup placement");
+            stabilizationMessageShown = true;
+        }
+    }
+    
+    float weightChange = weight - lastWeight; // Keep sign to distinguish increase vs decrease
+    
+    // Detect significant weight INCREASE (more than 10g) - cup placed
+    // Increased threshold from 5g to 10g to reduce false triggers from vibrations/noise
+    // Only trigger on positive weight changes to avoid false triggers from finger removal
+    if (weightChange > 10.0 && !waitingForStabilization) {
         waitingForStabilization = true;
         weightWhenChanged = weight;
         stabilizationStartTime = currentTime;
         lastWeightChangeTime = currentTime;
-        Serial.println("Cup detected - waiting for weight to stabilize...");
+        Serial.printf("Cup detected - weight change: %.2fg (from %.2fg to %.2fg) - waiting for weight to stabilize...\n", 
+                     weightChange, lastWeight, weight);
     }
     
     // Check if weight is stabilizing
@@ -884,6 +1005,7 @@ void Display::checkAutoTare(float weight) {
         if (currentChange > 1.0) { // Reduced from 2.0g to 1.0g for faster detection
             weightWhenChanged = weight;
             stabilizationStartTime = currentTime;
+            Serial.printf("Weight still changing: %.2fg - resetting stabilization timer\n", currentChange);
         }
         // If weight has been stable for 1 second, auto-tare (reduced from 2 seconds)
         else if (currentTime - stabilizationStartTime > 1000) {
@@ -909,20 +1031,20 @@ void Display::checkAutoTimer(float flowRate) {
         if (!timerRunning && !autoTimerStarted && flowRate > 0.2) {
             startTimer();
             autoTimerStarted = true;
+            
+            // Reset PowerManager timer state to sync when auto timer starts
+            if (powerManagerPtr != nullptr) {
+                powerManagerPtr->resetTimerState();
+            }
+            
             Serial.println("Auto-timer started - coffee flow detected");
         }
         
-        // Pause timer immediately when flow rate drops to 0.0
-        if (timerRunning && autoTimerStarted) {
-            if (flowRate <= 0.0) {
-                stopTimer();
-                Serial.println("Auto-timer paused - coffee flow stopped (0.0g/s)");
-            } else if (timerPaused && flowRate > 0.1) {
-                // Resume timer if flow picks up again
-                startTimer();
-                Serial.println("Auto-timer resumed - coffee flow detected again");
-            }
-        }
+        // Timer continues running even when flow stops
+        // Timer only stops when:
+        // 1. Cup is removed (handled by resetAutoSequence)
+        // 2. Power button is short-pressed (handled by PowerManager)
+        // No automatic stopping based on flow rate anymore
     }
     
     lastFlowRate = flowRate;
@@ -930,16 +1052,17 @@ void Display::checkAutoTimer(float flowRate) {
 
 void Display::resetAutoSequence() {
     if (currentMode == ScaleMode::AUTO) {
+        // Stop timer if it was auto-started (preserve the time, don't reset)
+        if (timerRunning && autoTimerStarted) {
+            stopTimer(); // Stop timer instead of reset to preserve final time
+            Serial.println("Auto-timer stopped - cup removed, time preserved");
+        }
+        
         autoTareEnabled = true;
         waitingForStabilization = false;
         autoTimerStarted = false;
         lastWeight = 0.0;
         lastFlowRate = 0.0;
-        
-        // Reset timer if it was auto-started
-        if (timerRunning && autoTimerStarted) {
-            resetTimer();
-        }
         
         Serial.println("Auto sequence reset - ready for new auto-tare cycle");
     }
