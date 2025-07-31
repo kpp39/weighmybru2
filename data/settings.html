@@ -83,14 +83,14 @@
         <p class="text-gray-400 text-sm mb-4">Time to wait before returning to stable mode (500-10000ms)</p>
         
         <label for="medianSamples" class="block mb-2">Brewing Mode Samples:</label>
-        <input type="number" id="medianSamples" name="medianSamples" step="1" min="1" max="20" class="w-32 px-3 py-2 mb-2 rounded text-black" />
+        <input type="number" id="medianSamples" name="medianSamples" step="1" min="1" max="50" class="w-32 px-3 py-2 mb-2 rounded text-black" />
         <span class="text-gray-400 ml-2">samples</span>
-        <p class="text-gray-400 text-sm mb-4">Number of samples for median filter during brewing (1-20)</p>
+        <p class="text-gray-400 text-sm mb-4">Number of samples for median filter during brewing (1-50)</p>
         
         <label for="averageSamples" class="block mb-2">Stable Mode Samples:</label>
-        <input type="number" id="averageSamples" name="averageSamples" step="1" min="1" max="20" class="w-32 px-3 py-2 mb-2 rounded text-black" />
+        <input type="number" id="averageSamples" name="averageSamples" step="1" min="1" max="50" class="w-32 px-3 py-2 mb-2 rounded text-black" />
         <span class="text-gray-400 ml-2">samples</span>
-        <p class="text-gray-400 text-sm mb-4">Number of samples for average filter when stable (1-20)</p>
+        <p class="text-gray-400 text-sm mb-4">Number of samples for average filter when stable (1-50)</p>
         
         <button type="submit" class="bg-gray-600 hover:bg-button-green active:bg-green-900 text-white px-4 py-2 rounded">Save Filter Settings</button>
         <button type="button" onclick="resetFilterSettings()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded ml-2">Reset to Defaults</button>
@@ -210,10 +210,10 @@
     // Reset filter settings to defaults
     function resetFilterSettings() {
       if (confirm('Reset filter settings to auto-detected defaults?')) {
-        document.getElementById('brewingThreshold').value = 0.25;  // 3kg load cell default
-        document.getElementById('stabilityTimeout').value = 2000;
-        document.getElementById('medianSamples').value = 3;
-        document.getElementById('averageSamples').value = 5;
+        document.getElementById('brewingThreshold').value = 0.5;  // Increased from 0.25 for more stability
+        document.getElementById('stabilityTimeout').value = 3000; // Increased from 2000 for more stability
+        document.getElementById('medianSamples').value = 5;
+        document.getElementById('averageSamples').value = 40;      // Higher default for smoother readings
         document.getElementById('filterForm').dispatchEvent(new Event('submit'));
       }
     }

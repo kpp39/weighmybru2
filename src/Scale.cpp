@@ -75,6 +75,18 @@ void Scale::loadCalibration() {
 }
 
 float Scale::getWeight() {
+    // Reduce reading frequency when stable to minimize noise
+    static unsigned long lastReadTime = 0;
+    unsigned long currentTime = millis();
+    
+    // Adaptive reading frequency: faster when brewing, slower when stable
+    unsigned long readInterval = brewingActive ? 10 : 50; // 10ms when brewing, 50ms when stable
+    
+    if (currentTime - lastReadTime < readInterval) {
+        return currentWeight; // Return cached weight if reading too frequently
+    }
+    lastReadTime = currentTime;
+    
     float rawReading = hx711.get_units(1);
     
     // Handle NaN or invalid readings
@@ -159,11 +171,27 @@ float Scale::averageFilter(int samples) {
     if (samples > MAX_SAMPLES) samples = MAX_SAMPLES;
     
     float sum = 0;
+    int validSamples = 0;
+    
+    // Calculate average but also apply additional smoothing for very stable readings
     for (int i = 0; i < samples; i++) {
         int idx = (readingIndex - 1 - i + MAX_SAMPLES) % MAX_SAMPLES;
         sum += readings[idx];
+        validSamples++;
     }
-    return sum / samples;
+    
+    float average = sum / validSamples;
+    
+    // Apply additional smoothing when in stable mode with high sample count
+    if (samples >= 30 && !brewingActive) {
+        // For very stable readings, apply extra smoothing to reduce micro-fluctuations
+        static float previousStableReading = average;
+        float smoothingFactor = 0.1f; // Stronger smoothing for high sample counts
+        average = previousStableReading * (1.0f - smoothingFactor) + average * smoothingFactor;
+        previousStableReading = average;
+    }
+    
+    return average;
 }
 
 // Filter parameter setters with validation

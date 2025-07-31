@@ -13,13 +13,13 @@
 #include "PowerManager.h"
 
 // Pins and calibration
-uint8_t dataPin = 12;
-uint8_t clockPin = 11;
+uint8_t dataPin = 5;   // HX711 Data pin (moved from 12)
+uint8_t clockPin = 6;  // HX711 Clock pin (moved from 11)
 uint8_t touchPin = 4;  // T0 - Confirmed working touch pin for tare
 uint8_t sleepTouchPin = 3;  // GPIO3 - Digital touch sensor for sleep functionality
-uint8_t sdaPin = 5;    // I2C Data pin for display (same side as other pins)
-uint8_t sclPin = 6;    // I2C Clock pin for display (same side as other pins)
-float calibrationFactor = 4762.1621;
+uint8_t sdaPin = 8;    // I2C Data pin for display (moved from 5)
+uint8_t sclPin = 9;    // I2C Clock pin for display (moved from 6)
+float calibrationFactor = 4195.712891;
 Scale scale(dataPin, clockPin, calibrationFactor);
 FlowRate flowRate;
 BluetoothScale bluetoothScale;
