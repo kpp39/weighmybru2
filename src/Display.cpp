@@ -932,6 +932,16 @@ float Display::getTimerSeconds() const {
     }
 }
 
+unsigned long Display::getElapsedTime() const {
+    if (!timerRunning) {
+        return 0;
+    } else if (timerPaused) {
+        return timerPausedTime;
+    } else {
+        return millis() - timerStartTime;
+    }
+}
+
 bool Display::isAutoTimerActive() const {
     return autoTimerStarted && timerRunning;
 }

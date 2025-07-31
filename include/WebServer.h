@@ -4,9 +4,10 @@
 #include "Scale.h"
 #include "FlowRate.h"
 #include "BluetoothScale.h"
+#include "Display.h"
 
 extern float calibrationFactor;
 
-void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale);
+void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale, Display &display);
 
 #endif

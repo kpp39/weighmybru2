@@ -56,6 +56,7 @@ public:
     void resetTimer();
     bool isTimerRunning() const;
     float getTimerSeconds() const;
+    unsigned long getElapsedTime() const; // Get current elapsed time in milliseconds
     
     // Auto mode timer management
     bool isAutoTimerActive() const; // Check if auto timer was started and is still active

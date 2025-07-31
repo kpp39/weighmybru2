@@ -48,12 +48,52 @@
   <main class="flex-grow overflow-y-auto p-8">
     <h1 class="text-3xl text-white font-bold mb-4">Dashboard</h1>
     <div class="bg-black-select p-6 rounded shadow max-w-md">
+      <div class="text-center mb-4">
+        <p class="text-lg text-green-400 font-semibold">Mode: <span id="mode" class="font-bold">FLOW</span></p>
+      </div>
       <p class="text-xl mb-4">Weight: <span id="weight" class="font-bold">0.0</span> g</p>
       <p class="text-xl mb-4">Flow Rate: <span id="flowrate" class="font-bold">0.000</span> g/s</p>
+      <div class="text-center mb-4">
+        <p class="text-lg text-blue-400">Timer: <span id="timer" class="font-bold font-mono">0:00.000</span></p>
+        <p class="text-sm text-gray-400" id="timerStatus">Stopped</p>
+      </div>
       <div class="mb-4">
         <button onclick="tareScale()" class="bg-gray-600 hover:bg-button-green active:bg-green-900 text-white px-4 py-2 rounded mr-2">Tare</button>
         <button id="brewModeBtn" onclick="toggleBrewMode()" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded">Brew Mode</button>
       </div>
+      
+      <!-- Mode Controls -->
+      <div class="mb-4 text-center">
+        <p class="text-sm text-gray-400 mb-2">Mode Controls:</p>
+        <div class="space-x-2">
+          <button onclick="setMode('FLOW')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Flow
+          </button>
+          <button onclick="setMode('TIME')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Time
+          </button>
+          <button onclick="setMode('AUTO')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Auto
+          </button>
+        </div>
+      </div>
+      
+      <!-- Timer Controls -->
+      <div class="mb-4 text-center">
+        <p class="text-sm text-gray-400 mb-2">Timer Controls:</p>
+        <div class="space-x-2">
+          <button onclick="startTimer()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Start
+          </button>
+          <button onclick="stopTimer()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Stop
+          </button>
+          <button onclick="resetTimer()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm">
+            Reset
+          </button>
+        </div>
+      </div>
+      
       <div id="updateStatus" class="text-sm text-gray-400"></div>
     </div>
   </main>
@@ -69,6 +109,45 @@
       .catch(err => alert("Tare failed!"));
   }
 
+  function startTimer() {
+    fetch('/api/timer/start', { method: 'POST' })
+      .then(response => response.text())
+      .then(data => console.log("Timer started:", data))
+      .catch(err => console.error("Timer start failed:", err));
+  }
+
+  function stopTimer() {
+    fetch('/api/timer/stop', { method: 'POST' })
+      .then(response => response.text())
+      .then(data => console.log("Timer stopped:", data))
+      .catch(err => console.error("Timer stop failed:", err));
+  }
+
+  function resetTimer() {
+    fetch('/api/timer/reset', { method: 'POST' })
+      .then(response => response.text())
+      .then(data => console.log("Timer reset:", data))
+      .catch(err => console.error("Timer reset failed:", err));
+  }
+
+  function setMode(mode) {
+    const params = new URLSearchParams();
+    params.append('mode', mode);
+    
+    fetch('/api/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+      .then(response => response.text())
+      .then(data => {
+        console.log("Mode changed:", data);
+        // Update the display immediately
+        updateWeight();
+      })
+      .catch(err => console.error("Mode change failed:", err));
+  }
+
   function updateWeight() {
     // Use combined endpoint for better performance
     fetch('/api/dashboard')
@@ -82,6 +161,36 @@
         
         document.getElementById('weight').innerText = weight.toFixed(decimalPlaces);
         document.getElementById('flowrate').innerText = flowrate.toFixed(1);
+        
+        // Update mode display
+        if (data.mode) {
+          document.getElementById('mode').innerText = data.mode;
+          // Color code the modes
+          const modeElement = document.getElementById('mode');
+          const modeContainer = modeElement.parentElement;
+          modeContainer.className = 'text-lg font-semibold';
+          switch(data.mode) {
+            case 'FLOW':
+              modeContainer.className += ' text-green-400';
+              break;
+            case 'TIME':
+              modeContainer.className += ' text-blue-400';
+              break;
+            case 'AUTO':
+              modeContainer.className += ' text-purple-400';
+              break;
+          }
+        }
+        
+        // Update timer display
+        if (data.timer_display) {
+          document.getElementById('timer').innerText = data.timer_display;
+          document.getElementById('timerStatus').innerText = data.timer_running ? 'Running' : 'Stopped';
+          
+          // Color code timer based on status
+          const timerElement = document.getElementById('timer');
+          timerElement.className = 'font-bold font-mono ' + (data.timer_running ? 'text-green-400' : 'text-gray-400');
+        }
       })
       .catch(err => console.error("Dashboard fetch error:", err));
   }

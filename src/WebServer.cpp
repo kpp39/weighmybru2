@@ -107,7 +107,7 @@ AsyncWebServer server(80);
  * Response: {"weight":45.23,"flowrate":2.15}
  */
 
-void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale) {
+void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale, Display &display) {
   if (!LittleFS.begin()) {
     return;
   }
@@ -121,12 +121,114 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
   getStoredSSID();            // This will cache WiFi credentials
 
   // Register API route first
-  server.on("/api/dashboard", HTTP_GET, [&scale, &flowRate](AsyncWebServerRequest *request) {
+  server.on("/api/dashboard", HTTP_GET, [&scale, &flowRate, &display](AsyncWebServerRequest *request) {
     String json = "{";
     json += "\"weight\":" + String(scale.getCurrentWeight(), 2) + ",";
-    json += "\"flowrate\":" + String(flowRate.getFlowRate(), 1);
+    json += "\"flowrate\":" + String(flowRate.getFlowRate(), 1) + ",";
+    
+    // Add current mode
+    String modeStr;
+    switch(display.getMode()) {
+      case ScaleMode::FLOW: modeStr = "FLOW"; break;
+      case ScaleMode::TIME: modeStr = "TIME"; break;
+      case ScaleMode::AUTO: modeStr = "AUTO"; break;
+      default: modeStr = "UNKNOWN"; break;
+    }
+    json += "\"mode\":\"" + modeStr + "\",";
+    
+    // Add timer information
+    unsigned long elapsedTime = display.getElapsedTime();
+    if (elapsedTime > 0 || display.isTimerRunning()) {
+      unsigned long minutes = elapsedTime / 60000;
+      unsigned long seconds = (elapsedTime % 60000) / 1000;
+      unsigned long milliseconds = elapsedTime % 1000;
+      json += "\"timer_running\":" + String(display.isTimerRunning() ? "true" : "false") + ",";
+      json += "\"timer_elapsed\":" + String(elapsedTime) + ",";
+      json += "\"timer_display\":\"" + String(minutes) + ":" + 
+              (seconds < 10 ? "0" : "") + String(seconds) + "." + 
+              (milliseconds < 100 ? (milliseconds < 10 ? "00" : "0") : "") + String(milliseconds) + "\"";
+    } else {
+      json += "\"timer_running\":false,";
+      json += "\"timer_elapsed\":0,";
+      json += "\"timer_display\":\"0:00.000\"";
+    }
+    
     json += "}";
     request->send(200, "application/json", json);
+  });
+
+  // Mode and timer specific endpoint
+  server.on("/api/mode", HTTP_GET, [&display](AsyncWebServerRequest *request) {
+    String json = "{";
+    
+    // Current mode
+    String modeStr;
+    switch(display.getMode()) {
+      case ScaleMode::FLOW: modeStr = "FLOW"; break;
+      case ScaleMode::TIME: modeStr = "TIME"; break;
+      case ScaleMode::AUTO: modeStr = "AUTO"; break;
+      default: modeStr = "UNKNOWN"; break;
+    }
+    json += "\"mode\":\"" + modeStr + "\",";
+    
+    // Timer information
+    unsigned long elapsedTime = display.getElapsedTime();
+    if (elapsedTime > 0 || display.isTimerRunning()) {
+      unsigned long minutes = elapsedTime / 60000;
+      unsigned long seconds = (elapsedTime % 60000) / 1000;
+      unsigned long milliseconds = elapsedTime % 1000;
+      json += "\"timer_running\":" + String(display.isTimerRunning() ? "true" : "false") + ",";
+      json += "\"timer_elapsed\":" + String(elapsedTime) + ",";
+      json += "\"timer_display\":\"" + String(minutes) + ":" + 
+              (seconds < 10 ? "0" : "") + String(seconds) + "." + 
+              (milliseconds < 100 ? (milliseconds < 10 ? "00" : "0") : "") + String(milliseconds) + "\"";
+    } else {
+      json += "\"timer_running\":false,";
+      json += "\"timer_elapsed\":0,";
+      json += "\"timer_display\":\"0:00.000\"";
+    }
+    
+    json += "}";
+    request->send(200, "application/json", json);
+  });
+
+  // Mode switching endpoint
+  server.on("/api/mode", HTTP_POST, [&display](AsyncWebServerRequest *request) {
+    if (request->hasParam("mode", true)) {
+      String mode = request->getParam("mode", true)->value();
+      mode.toUpperCase();
+      
+      if (mode == "FLOW") {
+        display.setMode(ScaleMode::FLOW);
+        request->send(200, "text/plain", "Mode set to FLOW");
+      } else if (mode == "TIME") {
+        display.setMode(ScaleMode::TIME);
+        request->send(200, "text/plain", "Mode set to TIME");
+      } else if (mode == "AUTO") {
+        display.setMode(ScaleMode::AUTO);
+        request->send(200, "text/plain", "Mode set to AUTO");
+      } else {
+        request->send(400, "text/plain", "Invalid mode. Use FLOW, TIME, or AUTO");
+      }
+    } else {
+      request->send(400, "text/plain", "Missing mode parameter");
+    }
+  });
+
+  // Timer control endpoints
+  server.on("/api/timer/start", HTTP_POST, [&display](AsyncWebServerRequest *request) {
+    display.startTimer();
+    request->send(200, "text/plain", "Timer started");
+  });
+
+  server.on("/api/timer/stop", HTTP_POST, [&display](AsyncWebServerRequest *request) {
+    display.stopTimer();
+    request->send(200, "text/plain", "Timer stopped");
+  });
+
+  server.on("/api/timer/reset", HTTP_POST, [&display](AsyncWebServerRequest *request) {
+    display.resetTimer();
+    request->send(200, "text/plain", "Timer reset");
   });
 
   server.on("/api/weight", HTTP_GET, [&scale](AsyncWebServerRequest *request) {

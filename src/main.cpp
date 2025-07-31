@@ -87,7 +87,7 @@ void setup() {
   // Link display to touch sensor for tare feedback
   touchSensor.setDisplay(&oledDisplay);
 
-  setupWebServer(scale, flowRate, bluetoothScale);
+  setupWebServer(scale, flowRate, bluetoothScale, oledDisplay);
 }
 
 void loop() {
