@@ -8,79 +8,113 @@
   <script src="/js/alpine.min.js" defer></script>
   <link rel="stylesheet" href="/css/all.min.css">
 </head>
-<body class="bg-black-background text-white">
+<body class="bg-gray-900 text-white font-sans flex items-center justify-center min-h-screen">
 
-<div class="md:flex flex-col md:flex-row md:min-h-screen w-full font-light">
-  <div @click.away="open = false" class="flex flex-col w-full md:w-64 text-gray-700 bg-black-discord dark-mode:text-gray-200 dark-mode:bg-gray-800 flex-shrink-0" x-data="{ open: false }">
-    <div class="flex-shrink-0 px-8 py-4 flex flex-row items-center justify-between">
-      <a href="#" class="text-lg font-semibold tracking-widest text-green-600 bg-black-discord uppercase rounded-lg dark-mode:text-white focus:outline-none focus:shadow-outline">WeighMyBru</a>
-      <button class="rounded-lg md:hidden focus:outline-none focus:shadow-outline" @click="open = !open">
+  <!-- Mobile Navigation (Hidden by default, shown on mobile) -->
+  <div @click.away="open = false" class="md:hidden fixed top-0 left-0 right-0 z-50 bg-black-discord" x-data="{ open: false }">
+    <div class="flex justify-between items-center px-4 py-3">
+      <a href="#" class="text-lg font-semibold tracking-widest text-green-600 uppercase">WeighMyBru</a>
+      <button class="focus:outline-none" @click="open = !open">
         <svg fill="currentColor" viewBox="0 0 20 20" class="w-6 h-6">
           <path x-show="!open" fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM9 15a1 1 0 011-1h6a1 1 0 110 2h-6a1 1 0 01-1-1z" clip-rule="evenodd"></path>
           <path x-show="open" fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
         </svg>
       </button>
     </div>
-    <nav :class="{'block': open, 'hidden': !open}" class="flex-grow md:block bg-black-discord px-4 pb-4 md:pb-0 md:overflow-y-auto">
-      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-stone-50 bg-black-select rounded-lg dark-mode:bg-gray-700 dark-mode:hover:bg-black-discord dark-mode:focus:bg-black-select dark-mode:focus:text-stone-50 dark-mode:hover:text-stone-50 dark-mode:text-gray-500 hover:text-stone-50 focus:text-stone-50 hover:bg-black-hover focus:black-select focus:outline-none focus:shadow-outline" href="/"><i class="fa fa-tachometer mr-2" aria-hidden="true" style="color: rgb(71, 168, 100);"></i>Dashboard</a>
-      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 focus:text-stone-50 hover:bg-black-hover focus:bg-black-select focus:outline-none focus:shadow-outline" href="/calibration.html"><i class="fa fa-balance-scale mr-2" aria-hidden="true" style="color: rgb(71, 168, 100);"></i>Calibration</a>
-      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 focus:text-stone-50 hover:bg-black-hover focus:bg-black-select focus:outline-none focus:shadow-outline" href="/settings.html"><i class="fa fa-cogs mr-2" aria-hidden="true" style="color: rgb(71, 168, 100);"></i>Settings</a>
-      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 focus:text-stone-50 hover:bg-black-hover focus:bg-black-select focus:outline-none focus:shadow-outline" href="/updates.html"><i class="fa fa-upload mr-2" aria-hidden="true" style="color: rgb(71, 168, 100);"></i>Updates</a>
+    <nav :class="{'block': open, 'hidden': !open}" class="px-4 pb-4 bg-black-discord">
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-stone-50 bg-black-select rounded-lg" href="/"><i class="fa fa-tachometer mr-2" style="color: rgb(71, 168, 100);"></i>Dashboard</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/calibration.html"><i class="fa fa-balance-scale mr-2" style="color: rgb(71, 168, 100);"></i>Calibration</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/settings.html"><i class="fa fa-cogs mr-2" style="color: rgb(71, 168, 100);"></i>Settings</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/updates.html"><i class="fa fa-upload mr-2" style="color: rgb(71, 168, 100);"></i>Updates</a>
     </nav>
   </div>
-  <main class="flex-grow overflow-y-auto p-8">
-    <h1 class="text-3xl text-white font-bold mb-4">Dashboard</h1>
-    <div class="bg-black-select p-6 rounded shadow max-w-md">
-      <div class="text-center mb-4">
-        <p class="text-lg text-green-400 font-semibold">Mode: <span id="mode" class="font-bold">FLOW</span></p>
-      </div>
-      <p class="text-xl mb-4">Weight: <span id="weight" class="font-bold">0.0</span> g</p>
-      <p class="text-xl mb-4">Flow Rate: <span id="flowrate" class="font-bold">0.000</span> g/s</p>
-      <div class="text-center mb-4">
-        <p class="text-lg text-blue-400">Timer: <span id="timer" class="font-bold font-mono">0:00.000</span></p>
-        <p class="text-sm text-gray-400" id="timerStatus">Stopped</p>
-      </div>
-      <div class="mb-4">
-        <button onclick="tareScale()" class="bg-gray-600 hover:bg-button-green active:bg-green-900 text-white px-4 py-2 rounded mr-2">Tare</button>
-        <button id="brewModeBtn" onclick="toggleBrewMode()" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded">Brew Mode</button>
-      </div>
-      
-      <!-- Mode Controls -->
-      <div class="mb-4 text-center">
-        <p class="text-sm text-gray-400 mb-2">Mode Controls:</p>
-        <div class="space-x-2">
-          <button onclick="setMode('FLOW')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Flow
-          </button>
-          <button onclick="setMode('TIME')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Time
-          </button>
-          <button onclick="setMode('AUTO')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Auto
-          </button>
-        </div>
-      </div>
-      
-      <!-- Timer Controls -->
-      <div class="mb-4 text-center">
-        <p class="text-sm text-gray-400 mb-2">Timer Controls:</p>
-        <div class="space-x-2">
-          <button onclick="startTimer()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Start
-          </button>
-          <button onclick="stopTimer()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Stop
-          </button>
-          <button onclick="resetTimer()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm">
-            Reset
-          </button>
-        </div>
-      </div>
-      
-      <div id="updateStatus" class="text-sm text-gray-400"></div>
+
+  <!-- Desktop Navigation (Fixed sidebar) -->
+  <div class="hidden md:flex md:flex-col md:w-64 md:fixed md:left-0 md:top-0 md:h-full bg-black-discord">
+    <div class="px-8 py-4">
+      <a href="#" class="text-lg font-semibold tracking-widest text-green-600 uppercase">WeighMyBru</a>
     </div>
-  </main>
-</div>
+    <nav class="flex-grow px-4 pb-4">
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-stone-50 bg-black-select rounded-lg" href="/"><i class="fa fa-tachometer mr-2" style="color: rgb(71, 168, 100);"></i>Dashboard</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/calibration.html"><i class="fa fa-balance-scale mr-2" style="color: rgb(71, 168, 100);"></i>Calibration</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/settings.html"><i class="fa fa-cogs mr-2" style="color: rgb(71, 168, 100);"></i>Settings</a>
+      <a class="block px-4 py-2 mt-2 text-sm font-semibold text-gray-400 bg-transparent rounded-lg hover:text-stone-50 hover:bg-black-hover" href="/updates.html"><i class="fa fa-upload mr-2" style="color: rgb(71, 168, 100);"></i>Updates</a>
+    </nav>
+  </div>
+
+  <!-- Main Content - Centered Card Layout -->
+  <div class="w-[375px] bg-gray-800 rounded-xl p-4 space-y-4 md:ml-64 mt-16 md:mt-0">
+    <!-- Title -->
+    <h1 class="text-center text-xl font-semibold">WeighMyBru Dashboard</h1>
+
+    <!-- Mode Badge -->
+    <div class="flex justify-center">
+      <span id="modeBadge" class="px-4 py-1 bg-green-600 text-white rounded-full text-sm font-medium">FLOW MODE</span>
+    </div>
+
+    <!-- Graph Placeholder -->
+    <div class="h-32 bg-gray-700 rounded-lg mt-2 flex items-center justify-center text-gray-400 text-sm">
+      Flow Rate Graph Placeholder
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-3 text-center text-lg font-medium mt-2">
+      <div>
+        <div id="weight" class="text-3xl font-bold">0.0</div>
+        <div class="text-sm text-gray-300">Weight<br/><span class="text-xs">g</span></div>
+      </div>
+      <div>
+        <div id="flowrate" class="text-3xl font-bold">0.000</div>
+        <div class="text-sm text-gray-300">Flow Rate<br/><span class="text-xs">g/s</span></div>
+      </div>
+      <div>
+        <div id="timer" class="text-3xl font-bold">0:00.000</div>
+        <div class="text-sm text-gray-300">Time</div>
+      </div>
+    </div>
+
+    <!-- Timer Status -->
+    <div class="text-center">
+      <p class="text-sm text-gray-400" id="timerStatus">Stopped</p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <button onclick="tareScale()" class="bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm font-semibold">Tare</button>
+      <button id="brewModeBtn" onclick="toggleBrewMode()" class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold">Brew Mode</button>
+    </div>
+    
+    <!-- Mode Control Buttons -->
+    <div class="grid grid-cols-3 gap-2 mt-2">
+      <button id="flowBtn" onclick="setMode('FLOW')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm">
+        Flow
+      </button>
+      <button id="timeBtn" onclick="setMode('TIME')" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm">
+        Time
+      </button>
+      <button id="autoBtn" onclick="setMode('AUTO')" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm">
+        Auto
+      </button>
+    </div>
+    
+    <!-- Timer Control Buttons -->
+    <div class="grid grid-cols-3 gap-2 mt-2">
+      <button onclick="startTimer()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm">
+        Start
+      </button>
+      <button onclick="stopTimer()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm">
+        Stop
+      </button>
+      <button onclick="resetTimer()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 rounded-lg text-sm">
+        Reset
+      </button>
+    </div>
+    
+    <!-- Status -->
+    <div class="text-center">
+      <div id="updateStatus" class="text-xs text-gray-400"></div>
+    </div>
+  </div>
 
 <script>
   let decimalPlaces = 1;
@@ -147,20 +181,26 @@
         
         // Update mode display
         if (data.mode) {
-          document.getElementById('mode').innerText = data.mode;
-          // Color code the modes
-          const modeElement = document.getElementById('mode');
-          const modeContainer = modeElement.parentElement;
-          modeContainer.className = 'text-lg font-semibold';
+          const modeBadge = document.getElementById('modeBadge');
+          modeBadge.innerText = data.mode + ' MODE';
+          // Keep mode badge always green
+          modeBadge.className = 'px-4 py-1 text-white rounded-full text-sm font-medium bg-green-600';
+          
+          // Update button states - reset all to gray first
+          document.getElementById('flowBtn').className = 'bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm';
+          document.getElementById('timeBtn').className = 'bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm';
+          document.getElementById('autoBtn').className = 'bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm';
+          
+          // Highlight the active mode button in green
           switch(data.mode) {
             case 'FLOW':
-              modeContainer.className += ' text-green-400';
+              document.getElementById('flowBtn').className = 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm';
               break;
             case 'TIME':
-              modeContainer.className += ' text-blue-400';
+              document.getElementById('timeBtn').className = 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm';
               break;
             case 'AUTO':
-              modeContainer.className += ' text-purple-400';
+              document.getElementById('autoBtn').className = 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm';
               break;
           }
         }
@@ -172,7 +212,7 @@
           
           // Color code timer based on status
           const timerElement = document.getElementById('timer');
-          timerElement.className = 'font-bold font-mono ' + (data.timer_running ? 'text-green-400' : 'text-gray-400');
+          timerElement.className = 'text-3xl font-bold ' + (data.timer_running ? 'text-green-400' : 'text-white');
         }
       })
       .catch(err => console.error("Dashboard fetch error:", err));
@@ -190,13 +230,13 @@
     
     if (manualBrewMode) {
       btn.textContent = 'Exit Brew Mode';
-      btn.className = 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-4 py-2 rounded';
+      btn.className = 'bg-red-600 hover:bg-red-700 py-2 rounded-lg text-sm font-semibold';
       status.textContent = 'Manual Brew Mode: Fast Updates (20/sec)';
       clearInterval(updateTimer);
       updateTimer = setInterval(updateWeight, 50); // 20x per second
     } else {
       btn.textContent = 'Brew Mode';
-      btn.className = 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded';
+      btn.className = 'bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold';
       status.textContent = 'Auto Mode: Smart Updates';
       clearInterval(updateTimer);
       updateTimer = setInterval(updateWeight, 200); // Back to normal
