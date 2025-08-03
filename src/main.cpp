@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
+#include <ESPmDNS.h>
 #include <esp_sleep.h>
 #include "WebServer.h"
 #include "Scale.h"
@@ -93,6 +94,7 @@ void setup() {
 void loop() {
   static unsigned long lastWeightUpdate = 0;
   static unsigned long lastWiFiCheck = 0;
+  static unsigned long lastMDNSUpdate = 0;
   
   // Update weight more frequently for brewing accuracy
   if (millis() - lastWeightUpdate >= 10) { // Update every 10ms
@@ -105,6 +107,12 @@ void loop() {
   if (millis() - lastWiFiCheck >= 30000) {
     printWiFiStatus();
     lastWiFiCheck = millis();
+  }
+  
+  // Update mDNS every 100ms for faster hostname resolution
+  if (millis() - lastMDNSUpdate >= 100) {
+    MDNS.update();
+    lastMDNSUpdate = millis();
   }
   
   // Update Bluetooth scale

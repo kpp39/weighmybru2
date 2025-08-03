@@ -159,8 +159,15 @@ void setupWiFi() {
     Serial.println("AP SSID: " + String(ap_ssid));
     Serial.println("AP MAC: " + WiFi.softAPmacAddress());
     
-    // Longer delay to ensure AP is fully stable before attempting STA
-    delay(3000);
+    // Start mDNS immediately for AP mode access
+    if (MDNS.begin("weighmybru")) {
+        Serial.println("mDNS responder started in AP mode");
+        Serial.println("Access the scale at: http://weighmybru.local or http://192.168.4.1");
+        MDNS.addService("http", "tcp", 80);
+    }
+    
+    // Reduced delay - AP is usually ready quickly
+    delay(1500);
     
     // Only try STA connection if credentials exist
     if (strlen(ssid) > 0) {
@@ -168,14 +175,14 @@ void setupWiFi() {
         
         // Switch to dual mode only after AP is stable
         WiFi.mode(WIFI_AP_STA);
-        delay(1000); // Give time for mode switch
+        delay(500); // Reduced delay for mode switch
         
         startAttemptTime = millis();
         WiFi.begin(ssid, password);
         
         // Wait for connection with shorter timeout to avoid AP disruption
         int connectionAttempts = 0;
-        const int maxAttempts = 20; // 10 seconds max
+        const int maxAttempts = 15; // Reduced to 7.5 seconds max
         
         while (WiFi.status() != WL_CONNECTED && connectionAttempts < maxAttempts) {
             delay(500);
@@ -226,7 +233,7 @@ void setupWiFi() {
 void setupmDNS() {
     // Start mDNS service with hostname "weighmybru"
     if (MDNS.begin("weighmybru")) {
-        Serial.println("mDNS responder started");
+        Serial.println("mDNS responder started/updated");
         Serial.println("Access the scale at: http://weighmybru.local");
         
         // Add service to MDNS-SD
@@ -236,6 +243,9 @@ void setupmDNS() {
         // Add some useful service properties
         MDNS.addServiceTxt("http", "tcp", "device", "WeighMyBru Coffee Scale");
         MDNS.addServiceTxt("http", "tcp", "version", "2.0");
+        
+        // Force immediate mDNS announcement
+        MDNS.announce();
         
     } else {
         Serial.println("Error starting mDNS responder");
