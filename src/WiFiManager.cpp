@@ -244,9 +244,6 @@ void setupmDNS() {
         MDNS.addServiceTxt("http", "tcp", "device", "WeighMyBru Coffee Scale");
         MDNS.addServiceTxt("http", "tcp", "version", "2.0");
         
-        // Force immediate mDNS announcement
-        MDNS.announce();
-        
     } else {
         Serial.println("Error starting mDNS responder");
     }
