@@ -92,12 +92,19 @@ void setup() {
 
 void loop() {
   static unsigned long lastWeightUpdate = 0;
+  static unsigned long lastWiFiCheck = 0;
   
   // Update weight more frequently for brewing accuracy
   if (millis() - lastWeightUpdate >= 10) { // Update every 10ms
     float weight = scale.getWeight();
     flowRate.update(weight);
     lastWeightUpdate = millis();
+  }
+  
+  // Check WiFi status every 30 seconds for debugging
+  if (millis() - lastWiFiCheck >= 30000) {
+    printWiFiStatus();
+    lastWiFiCheck = millis();
   }
   
   // Update Bluetooth scale

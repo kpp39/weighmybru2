@@ -44,6 +44,24 @@ void saveWiFiCredentials(const char* ssid, const char* password) {
     }
 }
 
+void clearWiFiCredentials() {
+    Serial.println("Clearing WiFi credentials...");
+    if (wifiPrefs.begin("wifi", false)) {
+        wifiPrefs.clear();
+        wifiPrefs.end();
+        
+        // Clear cache
+        cachedSSID = "";
+        cachedPassword = "";
+        credentialsCached = true;
+        lastCacheTime = millis();
+        
+        Serial.println("WiFi credentials cleared");
+    } else {
+        Serial.println("ERROR: Failed to open WiFi preferences for clearing");
+    }
+}
+
 bool loadWiFiCredentialsFromEEPROM() {
     // Check if cache is still valid first (no serial output for speed)
     if (credentialsCached && (millis() - lastCacheTime < CACHE_TIMEOUT)) {
@@ -121,29 +139,88 @@ void setupWiFi() {
     char ssid[33] = {0};
     char password[65] = {0};
     loadWiFiCredentials(ssid, password, sizeof(ssid));
-    startAttemptTime = millis();
-
-    // Start AP mode
-    WiFi.softAP(ap_ssid, ap_password);
+    
+    // Ensure WiFi is completely reset first
+    Serial.println("Resetting WiFi...");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+    
+    // Always start with AP mode first for stable operation
+    Serial.println("Starting AP mode...");
+    WiFi.mode(WIFI_AP); // Start with AP only first
+    
+    // Configure AP with specific settings for better visibility
+    WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+    bool apStarted = WiFi.softAP(ap_ssid, ap_password, 6, 0, 4); // Channel 6 (less congested), no hidden, max 4 connections
+    
+    Serial.println("AP Started: " + String(apStarted ? "YES" : "NO"));
     Serial.println("AP IP: " + WiFi.softAPIP().toString());
-
-    // Start Station mode if credentials exist
+    Serial.println("AP SSID: " + String(ap_ssid));
+    Serial.println("AP MAC: " + WiFi.softAPmacAddress());
+    
+    // Longer delay to ensure AP is fully stable before attempting STA
+    delay(3000);
+    
+    // Only try STA connection if credentials exist
     if (strlen(ssid) > 0) {
+        Serial.println("Attempting STA connection to: " + String(ssid));
+        
+        // Switch to dual mode only after AP is stable
+        WiFi.mode(WIFI_AP_STA);
+        delay(1000); // Give time for mode switch
+        
+        startAttemptTime = millis();
         WiFi.begin(ssid, password);
-        while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeout) {
+        
+        // Wait for connection with shorter timeout to avoid AP disruption
+        int connectionAttempts = 0;
+        const int maxAttempts = 20; // 10 seconds max
+        
+        while (WiFi.status() != WL_CONNECTED && connectionAttempts < maxAttempts) {
             delay(500);
             Serial.print(".");
+            connectionAttempts++;
+            
+            // Check if connection is failing badly
+            if (WiFi.status() == WL_NO_SSID_AVAIL || WiFi.status() == WL_CONNECT_FAILED) {
+                Serial.println("\nSTA connection failed - bad credentials detected");
+                Serial.println("Clearing stored credentials and keeping AP-only mode");
+                
+                // Clear bad credentials
+                clearWiFiCredentials();
+                
+                // Disconnect STA and go back to AP-only mode for stability
+                WiFi.disconnect(true);
+                WiFi.mode(WIFI_AP);
+                delay(1000);
+                
+                // Restart AP to ensure it's stable
+                WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
+                Serial.println("AP mode restored after credential failure");
+                break;
+            }
         }
+        
         if (WiFi.status() == WL_CONNECTED) {
             Serial.println("\nConnected to STA with IP: " + WiFi.localIP().toString());
-            setupmDNS(); // Setup mDNS hostname
+            Serial.println("Running in dual AP+STA mode");
         } else {
-            Serial.println("\nFailed to connect to STA. Continuing in AP mode...");
-            setupmDNS(); // Setup mDNS even in AP mode
+            Serial.println("\nSTA connection timeout. Running AP-only mode for stability.");
+            // Ensure we're back in AP-only mode
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_AP);
+            delay(1000);
+            WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
         }
     } else {
-        setupmDNS(); // Setup mDNS even without STA credentials
+        Serial.println("No stored WiFi credentials. AP mode only.");
     }
+    
+    // Setup mDNS after WiFi is stable
+    setupmDNS();
+    
+    Serial.println("WiFi setup complete. AP mode: " + String(ap_ssid) + " is always available.");
 }
 
 void setupmDNS() {
@@ -163,4 +240,18 @@ void setupmDNS() {
     } else {
         Serial.println("Error starting mDNS responder");
     }
+}
+
+void printWiFiStatus() {
+    Serial.println("=== WiFi Status ===");
+    Serial.println("WiFi Mode: " + String(WiFi.getMode()));
+    Serial.println("AP Status: " + String(WiFi.softAPgetStationNum()) + " clients connected");
+    Serial.println("AP IP: " + WiFi.softAPIP().toString());
+    Serial.println("AP SSID: " + String(ap_ssid));
+    Serial.println("STA Status: " + String(WiFi.status()));
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("STA IP: " + WiFi.localIP().toString());
+        Serial.println("STA RSSI: " + String(WiFi.RSSI()) + " dBm");
+    }
+    Serial.println("==================");
 }

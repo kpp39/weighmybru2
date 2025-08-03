@@ -313,6 +313,11 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
     }
   });
 
+  server.on("/api/wifi-creds", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+    clearWiFiCredentials();
+    request->send(200, "text/plain", "WiFi credentials cleared. Reboot to apply changes.");
+  });
+
   server.on("/api/decimal-setting", HTTP_GET, [](AsyncWebServerRequest *request) {
     int decimals = getCachedDecimals();
     String json = "{\"decimals\":" + String(decimals) + "}";
@@ -452,6 +457,19 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
     }
     // For all other unmatched paths, serve index.html (SPA fallback)
     request->send(LittleFS, "/index.html", "text/html");
+  });
+
+  // Add explicit MIME type handlers for font files
+  server.on("/css/all.min.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/css/all.min.css", "text/css");
+  });
+  
+  server.on("/webfonts/fa-solid-900.woff2", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/webfonts/fa-solid-900.woff2", "font/woff2");
+  });
+  
+  server.on("/webfonts/fa-regular-400.woff2", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/webfonts/fa-regular-400.woff2", "font/woff2");
   });
 
   server.begin();
