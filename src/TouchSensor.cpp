@@ -9,9 +9,10 @@ TouchSensor::TouchSensor(uint8_t touchPin, Scale* scale)
 }
 
 void TouchSensor::begin() {
-    // Set up the pin as digital input for the touch sensor module
-    pinMode(touchPin, INPUT);
-    Serial.println("Digital touch sensor initialized on pin " + String(touchPin));
+    // Set up the pin as digital input with pull-down resistor to prevent floating
+    pinMode(touchPin, INPUT_PULLDOWN);
+    Serial.println("Digital touch sensor initialized on pin " + String(touchPin) + " with pull-down resistor");
+    Serial.println("Pin will be LOW when not touched, HIGH when touched");
 }
 
 void TouchSensor::update() {
@@ -25,7 +26,7 @@ void TouchSensor::update() {
                 // Touch started - record start time for long press detection
                 touchStartTime = currentTime;
                 longPressDetected = false;
-                Serial.println("Touch started");
+                Serial.println("Touch started (pin HIGH detected)");
             } else {
                 // Touch ended
                 if (!longPressDetected) {
@@ -76,6 +77,12 @@ void TouchSensor::setDisplay(Display* display) {
 
 void TouchSensor::handleTouch() {
     if (scalePtr != nullptr) {
+        // Check if scale is actually connected before trying to tare
+        if (!scalePtr->isHX711Connected()) {
+            Serial.println("Touch detected but scale not connected - ignoring tare request");
+            return;
+        }
+        
         Serial.println("Touch detected! Taring scale...");
         
         // Show tare message on display if available

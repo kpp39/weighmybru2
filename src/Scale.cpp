@@ -40,56 +40,147 @@ bool Scale::begin() {
     
     preferences.end();
     
-    // Initialize HX711 with error handling
+    // Initialize HX711 with extremely conservative approach
     Serial.println("Initializing HX711...");
-    hx711.begin(dataPin, clockPin);
-    hx711.set_scale(calibrationFactor);
     
-    // Test if HX711 is responding with a timeout
-    Serial.println("Testing HX711 connection...");
-    unsigned long startTime = millis();
-    bool testPassed = false;
-    
-    // Try to get a reading with 3 second timeout
-    while (millis() - startTime < 3000) {
-        if (hx711.is_ready()) {
-            long testReading = hx711.read();
-            if (testReading != 0) {  // HX711 returns 0 when not connected
-                testPassed = true;
-                Serial.println("HX711 test reading: " + String(testReading));
-                break;
-            }
-        }
-        delay(100);  // Small delay between attempts
-    }
-    
-    if (testPassed) {
-        Serial.println("HX711 connected successfully");
-        isConnected = true;
-        
-        // Only tare if connection is confirmed
-        Serial.println("Performing initial tare...");
-        hx711.tare();
-        
-        Serial.println("Scale filtering configured:");
-        Serial.println("Brewing threshold: " + String(brewingThreshold) + "g");
-        Serial.println("Stability timeout: " + String(stabilityTimeout) + "ms");
-        Serial.println("Median samples: " + String(medianSamples));
-        Serial.println("Average samples: " + String(averageSamples));
-        
-        return true;
-    } else {
-        Serial.println("ERROR: HX711 not responding!");
-        Serial.println("Check connections:");
-        Serial.println("- VCC to 3.3V or 5V");
-        Serial.println("- GND to GND");
-        Serial.println("- DT to GPIO " + String(dataPin));
-        Serial.println("- SCK to GPIO " + String(clockPin));
-        Serial.println("- Load cell connections");
-        
+    // First verify pins are valid and accessible
+    if (dataPin > 48 || clockPin > 48) {  // ESP32-S3 has max 48 GPIO pins
+        Serial.println("ERROR: Invalid pin numbers");
         isConnected = false;
         return false;
     }
+    
+    // Test pin accessibility without configuring them yet
+    Serial.println("Testing pin accessibility...");
+    pinMode(dataPin, INPUT);
+    pinMode(clockPin, OUTPUT);
+    
+    // Initialize clock pin to LOW
+    digitalWrite(clockPin, LOW);
+    delay(100);  // Give HX711 time to respond
+    
+    // Check data pin state - HX711 may be LOW when busy, so this is just informational
+    bool dataLineState = digitalRead(dataPin);
+    Serial.println("Data pin state: " + String(dataLineState ? "HIGH" : "LOW"));
+    
+    // Try to initialize HX711 regardless of initial data pin state
+    Serial.println("Attempting HX711 initialization...");
+    
+    // Initialize HX711 object
+    hx711.begin(dataPin, clockPin);
+    
+    // Give HX711 time to stabilize after power-on
+    delay(500);
+    
+    // Test if HX711 responds within reasonable time
+    Serial.println("Testing HX711 responsiveness...");
+    unsigned long startTime = millis();
+    bool hx711Ready = false;
+    
+    // Try for up to 3 seconds to get a response
+    while (millis() - startTime < 3000) {
+        if (hx711.is_ready()) {
+            hx711Ready = true;
+            Serial.println("HX711 is ready after " + String(millis() - startTime) + "ms");
+            break;
+        }
+        delay(50);
+    }
+    
+    if (!hx711Ready) {
+        Serial.println("HX711 not responding after 3 seconds - checking for presence");
+        
+        // Try to wake up HX711 by pulsing clock
+        for (int i = 0; i < 25; i++) {  // 25 pulses to reset
+            digitalWrite(clockPin, HIGH);
+            delayMicroseconds(1);
+            digitalWrite(clockPin, LOW);
+            delayMicroseconds(1);
+        }
+        delay(100);
+        
+        // Try one more time
+        for (int i = 0; i < 10; i++) {
+            if (hx711.is_ready()) {
+                hx711Ready = true;
+                Serial.println("HX711 ready after reset pulse");
+                break;
+            }
+            delay(100);
+        }
+    }
+    
+    if (!hx711Ready) {
+        Serial.println("HX711 still not responding - may not be connected or powered");
+        isConnected = false;
+        return false;
+    }
+    
+    // Set connected flag and configure scale
+    isConnected = true;
+    
+    // Set scale factor
+    hx711.set_scale(calibrationFactor);
+    
+    // Try to get an initial reading to verify everything is working
+    Serial.println("Getting initial reading to verify HX711 operation...");
+    float testReading = 0;
+    bool gotReading = false;
+    
+    for (int i = 0; i < 5; i++) {
+        if (hx711.is_ready()) {
+            testReading = hx711.get_units(1);
+            if (!isnan(testReading)) {
+                gotReading = true;
+                break;
+            }
+        }
+        delay(200);
+    }
+    
+    if (gotReading) {
+        Serial.println("Initial reading: " + String(testReading) + "g");
+        Serial.println("HX711 is functioning correctly");
+        
+        // Auto-tare the scale during initialization for a clean start
+        Serial.println("Auto-taring scale for clean startup...");
+        hx711.tare(5);  // Take 5 readings for accurate tare
+        
+        // Verify tare was successful
+        delay(500);  // Let it settle
+        float postTareReading = 0;
+        for (int i = 0; i < 3; i++) {
+            if (hx711.is_ready()) {
+                postTareReading = hx711.get_units(1);
+                if (!isnan(postTareReading)) {
+                    break;
+                }
+            }
+            delay(100);
+        }
+        
+        Serial.println("Reading after tare: " + String(postTareReading) + "g");
+        
+        if (abs(postTareReading) < 1.0) {  // Should be close to 0 after tare
+            Serial.println("Auto-tare successful - scale zeroed");
+        } else {
+            Serial.println("WARNING: Large offset after tare - check for load on scale");
+        }
+        
+    } else {
+        Serial.println("WARNING: Could not get valid reading, but HX711 appears connected");
+    }
+    
+    Serial.println("HX711 initialized successfully");
+    Serial.println("Using pins - Data: GPIO" + String(dataPin) + ", Clock: GPIO" + String(clockPin));
+    Serial.println("Calibration factor: " + String(calibrationFactor));
+    Serial.println("Scale filtering configured:");
+    Serial.println("Brewing threshold: " + String(brewingThreshold) + "g");
+    Serial.println("Stability timeout: " + String(stabilityTimeout) + "ms");
+    Serial.println("Median samples: " + String(medianSamples));
+    Serial.println("Average samples: " + String(averageSamples));
+    
+    return true;
 }
 
 void Scale::tare(uint8_t times) {
@@ -98,9 +189,22 @@ void Scale::tare(uint8_t times) {
         return;
     }
     
-    Serial.println("Taring scale...");
+    Serial.println("Taring scale with " + String(times) + " readings...");
+    
+    // Clear any existing filter data before taring
+    samplesInitialized = false;
+    for (int i = 0; i < MAX_SAMPLES; i++) {
+        readings[i] = 0.0f;
+    }
+    readingIndex = 0;
+    
+    // Perform the tare
     hx711.tare(times);
-    Serial.println("Tare complete");
+    
+    // Reset current weight to 0
+    currentWeight = 0.0f;
+    
+    Serial.println("Tare complete - scale zeroed");
 }
 
 void Scale::set_scale(float factor) {

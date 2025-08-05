@@ -17,6 +17,8 @@ public:
     ~BluetoothScale();
     
     void begin(Scale* scale);
+    void begin();  // Initialize without scale reference
+    void setScale(Scale* scale);  // Set scale reference later
     void end();
     void update();
     bool isConnected();

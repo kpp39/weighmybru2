@@ -1,5 +1,8 @@
 #include "BluetoothScale.h"
 #include <Arduino.h>
+#include <stdexcept>
+#include "esp_bt.h"
+#include "esp_bt_main.h"
 
 // UUIDs for WeighMyBru protocol - unique to avoid conflicts with Bookoo scales
 const char* BluetoothScale::SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
@@ -18,10 +21,63 @@ BluetoothScale::~BluetoothScale() {
 }
 
 void BluetoothScale::begin(Scale* scaleInstance) {
+    // Store scale reference for later use
     scale = scaleInstance;
-    initializeBLE();
-    startAdvertising();
-    Serial.println("BluetoothScale: Started advertising as WeighMyBru");
+    
+    Serial.println("BluetoothScale: Starting BLE initialization...");
+    
+    // Check available memory before BLE initialization
+    size_t freeHeap = ESP.getFreeHeap();
+    Serial.println("BluetoothScale: Free heap before BLE: " + String(freeHeap) + " bytes");
+    
+    if (freeHeap < 50000) {  // Need at least 50KB for BLE
+        Serial.println("BluetoothScale: Insufficient memory for BLE - disabling");
+        scale = nullptr;
+        return;
+    }
+    
+    // Add comprehensive error handling for BLE initialization
+    bool initializationSuccessful = false;
+    
+    try {
+        Serial.println("BluetoothScale: Releasing Classic BT memory...");
+        
+        // Release Classic Bluetooth memory more carefully
+        esp_err_t ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        if (ret != ESP_OK) {
+            Serial.println("BluetoothScale: Warning - could not release Classic BT memory: " + String(esp_err_to_name(ret)));
+        }
+        
+        Serial.println("BluetoothScale: Initializing BLE device directly...");
+        
+        // Skip btStart() and go directly to BLE initialization
+        // This avoids the problematic Bluetooth controller initialization
+        initializeBLE();
+        
+        // Small delay before starting advertising
+        delay(200);
+        
+        startAdvertising();
+        
+        Serial.println("BluetoothScale: Successfully started advertising as WeighMyBru");
+        initializationSuccessful = true;
+        
+    } catch (const std::exception& e) {
+        Serial.println("BluetoothScale: Exception during initialization: " + String(e.what()));
+        scale = nullptr;
+    } catch (...) {
+        Serial.println("BluetoothScale: Unknown error during initialization - disabling Bluetooth");
+        scale = nullptr;
+    }
+    
+    if (!initializationSuccessful) {
+        Serial.println("BluetoothScale: BLE initialization failed - scale will work without Bluetooth");
+        // Clean up any partial initialization
+        end();
+    } else {
+        Serial.println("BluetoothScale: BLE initialization completed successfully");
+        Serial.println("BluetoothScale: Free heap after BLE: " + String(ESP.getFreeHeap()) + " bytes");
+    }
 }
 
 void BluetoothScale::end() {
@@ -37,15 +93,76 @@ void BluetoothScale::end() {
 }
 
 void BluetoothScale::initializeBLE() {
-    // Initialize BLE Device with WeighMyBru name
-    BLEDevice::init("WeighMyBru");
+    Serial.println("BluetoothScale: Initializing BLE device...");
+    
+    // Try multiple BLE initialization strategies
+    bool bleInitSuccess = false;
+    
+    // Strategy 1: Standard initialization
+    try {
+        Serial.println("BluetoothScale: Attempting standard BLE initialization...");
+        BLEDevice::init("WeighMyBru");
+        bleInitSuccess = true;
+        Serial.println("BluetoothScale: Standard BLE initialization successful");
+    } catch (...) {
+        Serial.println("BluetoothScale: Standard BLE initialization failed, trying alternative...");
+    }
+    
+    // Strategy 2: Initialize with minimal configuration
+    if (!bleInitSuccess) {
+        try {
+            Serial.println("BluetoothScale: Attempting minimal BLE initialization...");
+            // Deinitialize first in case of partial state
+            BLEDevice::deinit(true);
+            delay(1000);
+            
+            // Try with shorter name
+            BLEDevice::init("WMB");
+            bleInitSuccess = true;
+            Serial.println("BluetoothScale: Minimal BLE initialization successful");
+        } catch (...) {
+            Serial.println("BluetoothScale: Minimal BLE initialization also failed");
+        }
+    }
+    
+    // Strategy 3: Delayed retry with memory management
+    if (!bleInitSuccess) {
+        try {
+            Serial.println("BluetoothScale: Attempting delayed BLE initialization...");
+            
+            // Wait and try again with more time
+            delay(2000);
+            
+            BLEDevice::init("WeighMyBru");
+            bleInitSuccess = true;
+            Serial.println("BluetoothScale: Delayed BLE initialization successful");
+        } catch (...) {
+            Serial.println("BluetoothScale: All BLE initialization strategies failed");
+        }
+    }
+    
+    if (!bleInitSuccess) {
+        throw std::runtime_error("BLE initialization failed after all retry strategies");
+    }
+    
+    Serial.println("BluetoothScale: Creating BLE server...");
     
     // Create BLE Server
     server = BLEDevice::createServer();
+    if (!server) {
+        throw std::runtime_error("Failed to create BLE server");
+    }
     server->setCallbacks(this);
+    
+    Serial.println("BluetoothScale: Creating BLE service...");
     
     // Create BLE Service
     service = server->createService(SERVICE_UUID);
+    if (!service) {
+        throw std::runtime_error("Failed to create BLE service");
+    }
+    
+    Serial.println("BluetoothScale: Creating characteristics...");
     
     // Create Weight Characteristic (for notifications)
     weightCharacteristic = service->createCharacteristic(
@@ -54,6 +171,10 @@ void BluetoothScale::initializeBLE() {
         BLECharacteristic::PROPERTY_NOTIFY |
         BLECharacteristic::PROPERTY_INDICATE
     );
+    
+    if (!weightCharacteristic) {
+        throw std::runtime_error("Failed to create weight characteristic");
+    }
     
     // Add Client Characteristic Configuration Descriptor for notifications
     BLE2902* weightDescriptor = new BLE2902();
@@ -67,16 +188,30 @@ void BluetoothScale::initializeBLE() {
         BLECharacteristic::PROPERTY_WRITE_NR |
         BLECharacteristic::PROPERTY_NOTIFY
     );
+    
+    if (!commandCharacteristic) {
+        throw std::runtime_error("Failed to create command characteristic");
+    }
     commandCharacteristic->setCallbacks(this);
+    
+    Serial.println("BluetoothScale: Starting service...");
     
     // Start the service
     service->start();
     
+    Serial.println("BluetoothScale: Setting up advertising...");
+    
     // Get advertising object
     advertising = BLEDevice::getAdvertising();
+    if (!advertising) {
+        throw std::runtime_error("Failed to get advertising object");
+    }
+    
     advertising->addServiceUUID(SERVICE_UUID);
     advertising->setScanResponse(false);
     advertising->setMinPreferred(0x0);
+    
+    Serial.println("BluetoothScale: BLE initialization completed successfully");
 }
 
 void BluetoothScale::startAdvertising() {
@@ -92,6 +227,11 @@ void BluetoothScale::stopAdvertising() {
 }
 
 void BluetoothScale::update() {
+    // Return early if initialization failed
+    if (scale == nullptr) {
+        return;
+    }
+    
     uint32_t now = millis();
     
     // Handle connection state changes
@@ -270,4 +410,14 @@ void BluetoothScale::onWrite(BLECharacteristic* pCharacteristic) {
         Serial.printf("BluetoothScale: Received %d bytes\n", length);
         processIncomingMessage(data, length);
     }
+}
+
+// Overloaded begin method for early initialization
+void BluetoothScale::begin() {
+    begin(nullptr);  // Initialize without scale reference
+}
+
+void BluetoothScale::setScale(Scale* scaleInstance) {
+    scale = scaleInstance;
+    Serial.println("BluetoothScale: Scale reference set");
 }

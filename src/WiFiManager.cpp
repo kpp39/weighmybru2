@@ -146,9 +146,9 @@ void setupWiFi() {
     WiFi.mode(WIFI_OFF);
     delay(500); // Longer delay for complete reset
     
-    // Disable WiFi sleep mode to prevent connection drops
-    WiFi.setSleep(false);
-    Serial.println("WiFi sleep disabled for stable connections");
+    // Enable WiFi sleep mode for BLE coexistence (required when both WiFi and BLE are active)
+    WiFi.setSleep(true);
+    Serial.println("WiFi sleep enabled for BLE coexistence");
     
     // Always start with AP mode first for stable operation
     Serial.println("Starting AP mode...");
@@ -321,10 +321,10 @@ void maintainWiFi() {
             Serial.println("AP mode restored");
         }
         
-        // Ensure WiFi sleep stays disabled
-        if (WiFi.getSleep()) {
-            Serial.println("WARNING: WiFi sleep was re-enabled! Disabling...");
-            WiFi.setSleep(false);
+        // Ensure WiFi sleep stays enabled for BLE coexistence
+        if (!WiFi.getSleep()) {
+            Serial.println("WARNING: WiFi sleep was disabled! Re-enabling for BLE coexistence...");
+            WiFi.setSleep(true);
         }
         
         // Print status for debugging
