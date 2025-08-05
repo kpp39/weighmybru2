@@ -14,5 +14,6 @@ String getStoredSSID();
 String getStoredPassword();
 void setupmDNS(); // Setup mDNS for weighmybru.local hostname
 void printWiFiStatus(); // Print detailed WiFi status for debugging
+void maintainWiFi(); // Periodic WiFi maintenance to ensure AP stability
 
 #endif

@@ -52,6 +52,11 @@
       <span id="modeBadge" class="px-4 py-1 bg-green-600 text-white rounded-full text-sm font-medium">FLOW MODE</span>
     </div>
 
+    <!-- Scale Status Indicator -->
+    <div class="flex justify-center">
+      <span id="scaleStatus" class="px-3 py-1 bg-green-600 text-white rounded-full text-xs font-medium">Scale Connected</span>
+    </div>
+
     <!-- Graph Placeholder -->
     <div class="h-32 bg-gray-700 rounded-lg mt-2 flex items-center justify-center text-gray-400 text-sm">
       Flow Rate Graph Placeholder
@@ -178,6 +183,16 @@
         
         document.getElementById('weight').innerText = weight.toFixed(decimalPlaces);
         document.getElementById('flowrate').innerText = flowrate.toFixed(1);
+        
+        // Update scale connection status
+        const scaleStatus = document.getElementById('scaleStatus');
+        if (data.scale_connected) {
+          scaleStatus.innerText = 'Scale Connected';
+          scaleStatus.className = 'px-3 py-1 bg-green-600 text-white rounded-full text-xs font-medium';
+        } else {
+          scaleStatus.innerText = 'Scale Disconnected';
+          scaleStatus.className = 'px-3 py-1 bg-red-600 text-white rounded-full text-xs font-medium';
+        }
         
         // Update mode display
         if (data.mode) {

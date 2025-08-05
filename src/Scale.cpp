@@ -11,7 +11,9 @@ Scale::Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor)
     }
 }
 
-void Scale::begin() {
+bool Scale::begin() {
+    Serial.println("Starting scale initialization...");
+    
     preferences.begin("scale", false);
     calibrationFactor = preferences.getFloat("calib", calibrationFactor);
     
@@ -37,19 +39,68 @@ void Scale::begin() {
     }
     
     preferences.end();
+    
+    // Initialize HX711 with error handling
+    Serial.println("Initializing HX711...");
     hx711.begin(dataPin, clockPin);
     hx711.set_scale(calibrationFactor);
-    tare();
     
-    Serial.println("Scale filtering configured:");
-    Serial.println("Brewing threshold: " + String(brewingThreshold) + "g");
-    Serial.println("Stability timeout: " + String(stabilityTimeout) + "ms");
-    Serial.println("Median samples: " + String(medianSamples));
-    Serial.println("Average samples: " + String(averageSamples));
+    // Test if HX711 is responding with a timeout
+    Serial.println("Testing HX711 connection...");
+    unsigned long startTime = millis();
+    bool testPassed = false;
+    
+    // Try to get a reading with 3 second timeout
+    while (millis() - startTime < 3000) {
+        if (hx711.is_ready()) {
+            long testReading = hx711.read();
+            if (testReading != 0) {  // HX711 returns 0 when not connected
+                testPassed = true;
+                Serial.println("HX711 test reading: " + String(testReading));
+                break;
+            }
+        }
+        delay(100);  // Small delay between attempts
+    }
+    
+    if (testPassed) {
+        Serial.println("HX711 connected successfully");
+        isConnected = true;
+        
+        // Only tare if connection is confirmed
+        Serial.println("Performing initial tare...");
+        hx711.tare();
+        
+        Serial.println("Scale filtering configured:");
+        Serial.println("Brewing threshold: " + String(brewingThreshold) + "g");
+        Serial.println("Stability timeout: " + String(stabilityTimeout) + "ms");
+        Serial.println("Median samples: " + String(medianSamples));
+        Serial.println("Average samples: " + String(averageSamples));
+        
+        return true;
+    } else {
+        Serial.println("ERROR: HX711 not responding!");
+        Serial.println("Check connections:");
+        Serial.println("- VCC to 3.3V or 5V");
+        Serial.println("- GND to GND");
+        Serial.println("- DT to GPIO " + String(dataPin));
+        Serial.println("- SCK to GPIO " + String(clockPin));
+        Serial.println("- Load cell connections");
+        
+        isConnected = false;
+        return false;
+    }
 }
 
 void Scale::tare(uint8_t times) {
+    if (!isConnected) {
+        Serial.println("Cannot tare: HX711 not connected");
+        return;
+    }
+    
+    Serial.println("Taring scale...");
     hx711.tare(times);
+    Serial.println("Tare complete");
 }
 
 void Scale::set_scale(float factor) {
@@ -74,6 +125,11 @@ void Scale::loadCalibration() {
 }
 
 float Scale::getWeight() {
+    // Return 0 if HX711 is not connected
+    if (!isConnected) {
+        return 0.0f;
+    }
+    
     static unsigned long lastReadTime = 0;
     unsigned long currentTime = millis();
     
@@ -82,6 +138,11 @@ float Scale::getWeight() {
         return currentWeight;
     }
     lastReadTime = currentTime;
+
+    // Check if HX711 is ready before attempting to read
+    if (!hx711.is_ready()) {
+        return currentWeight;  // Return last known value if not ready
+    }
     
     float rawReading = hx711.get_units(1);
     
@@ -111,6 +172,9 @@ float Scale::getCurrentWeight() {
 }
 
 long Scale::getRawValue() {
+    if (!isConnected) {
+        return 0;  // Return 0 if HX711 not connected
+    }
     return hx711.get_value(1); // Get raw value from HX711
 }
 

@@ -125,6 +125,7 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
     String json = "{";
     json += "\"weight\":" + String(scale.getCurrentWeight(), 2) + ",";
     json += "\"flowrate\":" + String(flowRate.getFlowRate(), 1) + ",";
+    json += "\"scale_connected\":" + String(scale.isHX711Connected() ? "true" : "false") + ",";
     
     // Add current mode
     String modeStr;
@@ -293,6 +294,17 @@ void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothS
 
   server.on("/api/calibrationfactor", HTTP_GET, [&scale](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", String(scale.getCalibrationFactor(), 6));
+  });
+
+  // Scale connection status endpoint
+  server.on("/api/scale/status", HTTP_GET, [&scale](AsyncWebServerRequest *request) {
+    String json = "{";
+    json += "\"connected\":" + String(scale.isHX711Connected() ? "true" : "false") + ",";
+    json += "\"weight\":" + String(scale.getCurrentWeight(), 2) + ",";
+    json += "\"raw_value\":" + String(scale.getRawValue()) + ",";
+    json += "\"calibration_factor\":" + String(scale.getCalibrationFactor(), 6);
+    json += "}";
+    request->send(200, "application/json", json);
   });
 
   server.on("/api/wifi-creds", HTTP_GET, [](AsyncWebServerRequest *request) {

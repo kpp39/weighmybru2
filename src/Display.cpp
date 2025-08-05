@@ -18,15 +18,52 @@ Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRat
 }
 
 bool Display::begin() {
+    Serial.println("Initializing display...");
+    
     // Initialize I2C with custom pins
     Wire.begin(sdaPin, sclPin);
     
-    // Initialize the display
-    if (!display->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        Serial.println("SSD1306 allocation failed");
+    // Test I2C connection first with timeout
+    Serial.println("Testing I2C connection to display...");
+    unsigned long startTime = millis();
+    const unsigned long I2C_TIMEOUT = 3000; // 3 second timeout
+    
+    bool i2cResponding = false;
+    Wire.beginTransmission(SCREEN_ADDRESS);
+    
+    // Wait for I2C response with timeout
+    while (millis() - startTime < I2C_TIMEOUT) {
+        if (Wire.endTransmission() == 0) {
+            i2cResponding = true;
+            Serial.println("I2C device found at display address");
+            break;
+        }
+        delay(100);
+        Wire.beginTransmission(SCREEN_ADDRESS);
+    }
+    
+    if (!i2cResponding) {
+        Serial.println("ERROR: No I2C device found at display address");
+        Serial.println("Display will be disabled - running headless mode");
+        Serial.println("Check connections:");
+        Serial.printf("- SDA to GPIO %d\n", sdaPin);
+        Serial.printf("- SCL to GPIO %d\n", sclPin);
+        Serial.println("- VCC to 3.3V");
+        Serial.println("- GND to GND");
+        displayConnected = false;
         return false;
     }
     
+    // Initialize the display
+    if (!display->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+        Serial.println("ERROR: SSD1306 initialization failed");
+        Serial.println("Display will be disabled - running headless mode");
+        displayConnected = false;
+        return false;
+    }
+    
+    Serial.println("Display connected and initialized successfully");
+    displayConnected = true;
     setupDisplay();
     
     // Show startup message in same format as welcome message
@@ -68,12 +105,22 @@ bool Display::begin() {
 }
 
 void Display::setupDisplay() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     display->clearDisplay();
     display->setTextColor(SSD1306_WHITE);
     display->cp437(true); // Use full 256 char 'Code Page 437' font
 }
 
 void Display::update() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Check if we're showing a temporary message
     if (showingMessage) {
         if (millis() - messageStartTime > messageDuration) { // Use stored duration
@@ -126,6 +173,11 @@ void Display::update() {
 }
 
 void Display::showWeight(float weight) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     if (showingMessage) return; // Don't override messages
     
     // Handle different modes
@@ -143,6 +195,11 @@ void Display::showWeight(float weight) {
 }
 
 void Display::showMessage(const String& message, int duration) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     currentMessage = message;
     messageStartTime = millis();
     messageDuration = duration; // Store the duration
@@ -173,6 +230,11 @@ void Display::showMessage(const String& message, int duration) {
 }
 
 void Display::showSleepCountdown(int seconds) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Sleep countdown active";
     messageStartTime = millis();
@@ -213,6 +275,11 @@ void Display::showSleepCountdown(int seconds) {
 }
 
 void Display::showSleepMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Sleep message active";
     messageStartTime = millis();
@@ -250,6 +317,11 @@ void Display::showSleepMessage() {
 }
 
 void Display::showGoingToSleepMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Going to sleep message";
     messageStartTime = millis();
@@ -291,6 +363,11 @@ void Display::showGoingToSleepMessage() {
 }
 
 void Display::showSleepCancelledMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Sleep cancelled message";
     messageStartTime = millis();
@@ -332,6 +409,11 @@ void Display::showSleepCancelledMessage() {
 }
 
 void Display::showTaringMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Taring message";
     messageStartTime = millis();
@@ -374,6 +456,11 @@ void Display::showTaringMessage() {
 }
 
 void Display::showTaredMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Tared message";
     messageStartTime = millis();
@@ -415,6 +502,11 @@ void Display::showTaredMessage() {
 }
 
 void Display::showAutoTaredMessage() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Auto Tared message";
     messageStartTime = millis();
@@ -463,6 +555,11 @@ void Display::clearMessageState() {
 }
 
 void Display::showIPAddresses() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // First show the WeighMyBru Ready message for 3 seconds
     display->clearDisplay();
     display->setTextSize(2);
@@ -543,11 +640,21 @@ void Display::showIPAddresses() {
 }
 
 void Display::clear() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     display->clearDisplay();
     display->display();
 }
 
 void Display::setBrightness(uint8_t brightness) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // SSD1306 doesn't have brightness control, but we can simulate with contrast
     display->ssd1306_command(SSD1306_SETCONTRAST);
     display->ssd1306_command(brightness);
@@ -562,6 +669,11 @@ void Display::setPowerManager(PowerManager* powerManager) {
 }
 
 void Display::drawBluetoothStatus() {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Only draw if we have a bluetooth instance and it's connected
     if (bluetoothPtr && bluetoothPtr->isConnected()) {
         // Draw a small "BT" in the top-right corner
@@ -572,6 +684,11 @@ void Display::drawBluetoothStatus() {
 }
 
 void Display::drawWeight(float weight) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     display->clearDisplay();
     
     // Apply deadband to prevent flickering between 0.0g and -0.0g
@@ -637,6 +754,11 @@ void Display::drawWeight(float weight) {
 }
 
 void Display::showWeightWithTimer(float weight) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     display->clearDisplay();
     
     // Apply deadband to prevent flickering between 0.0g and -0.0g
@@ -685,6 +807,11 @@ void Display::showWeightWithTimer(float weight) {
 }
 
 void Display::showWeightWithFlowAndTimer(float weight) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Don't run auto-tare checks if we're showing a message
     if (!showingMessage) {
         checkAutoTare(weight);
@@ -781,6 +908,11 @@ void Display::showModeMessage(ScaleMode mode) {
 }
 
 void Display::showModeMessage(ScaleMode mode, int duration) {
+    // Return early if display is not connected
+    if (!displayConnected) {
+        return;
+    }
+    
     // Set message state to prevent weight display interference
     currentMessage = "Mode change message";
     messageStartTime = millis();

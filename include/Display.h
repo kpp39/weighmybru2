@@ -20,6 +20,7 @@ class Display {
 public:
     Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate);
     bool begin();
+    bool isConnected() const { return displayConnected; } // Check if display is available
     void update();
     void showWeight(float weight);
     void showMessage(const String& message, int duration = 2000);
@@ -78,6 +79,7 @@ private:
     BluetoothScale* bluetoothPtr;
     PowerManager* powerManagerPtr;
     Adafruit_SSD1306* display;
+    bool displayConnected = false; // Track if display is actually connected
     
     static const uint8_t SCREEN_WIDTH = 128;
     static const uint8_t SCREEN_HEIGHT = 32;

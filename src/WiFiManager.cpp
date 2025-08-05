@@ -144,15 +144,41 @@ void setupWiFi() {
     Serial.println("Resetting WiFi...");
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
-    delay(100);
+    delay(500); // Longer delay for complete reset
+    
+    // Disable WiFi sleep mode to prevent connection drops
+    WiFi.setSleep(false);
+    Serial.println("WiFi sleep disabled for stable connections");
     
     // Always start with AP mode first for stable operation
     Serial.println("Starting AP mode...");
-    WiFi.mode(WIFI_AP); // Start with AP only first
+    WiFi.mode(WIFI_AP);
+    delay(1000); // Ensure mode switch is stable
     
-    // Configure AP with specific settings for better visibility
+    // Configure AP with optimized settings for stability
     WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
-    bool apStarted = WiFi.softAP(ap_ssid, ap_password, 6, 0, 4); // Channel 6 (less congested), no hidden, max 4 connections
+    
+    // Try different channels if AP fails to start
+    bool apStarted = false;
+    int channels[] = {1, 6, 11}; // Less congested channels
+    
+    for (int i = 0; i < 3 && !apStarted; i++) {
+        Serial.printf("Trying AP on channel %d...\n", channels[i]);
+        apStarted = WiFi.softAP(ap_ssid, ap_password, channels[i], 0, 8); // Increased max clients to 8
+        
+        if (apStarted) {
+            Serial.printf("AP started successfully on channel %d\n", channels[i]);
+            break;
+        } else {
+            Serial.printf("Failed to start AP on channel %d, trying next...\n", channels[i]);
+            delay(1000);
+        }
+    }
+    
+    if (!apStarted) {
+        Serial.println("ERROR: Failed to start AP on all channels! Trying default...");
+        apStarted = WiFi.softAP(ap_ssid, ap_password); // Try with default settings
+    }
     
     Serial.println("AP Started: " + String(apStarted ? "YES" : "NO"));
     Serial.println("AP IP: " + WiFi.softAPIP().toString());
@@ -166,23 +192,28 @@ void setupWiFi() {
         MDNS.addService("http", "tcp", 80);
     }
     
-    // Reduced delay - AP is usually ready quickly
-    delay(1500);
+    // Give AP more time to fully stabilize
+    delay(2000);
     
     // Only try STA connection if credentials exist
     if (strlen(ssid) > 0) {
         Serial.println("Attempting STA connection to: " + String(ssid));
+        Serial.println("NOTE: STA connection may cause temporary AP instability");
         
-        // Switch to dual mode only after AP is stable
+        // Switch to dual mode only after AP is fully stable
         WiFi.mode(WIFI_AP_STA);
-        delay(500); // Reduced delay for mode switch
+        delay(1000); // Longer delay for stable mode switch
+        
+        // Restart AP after mode switch to ensure it stays active
+        WiFi.softAP(ap_ssid, ap_password, 6, 0, 8);
+        delay(500);
         
         startAttemptTime = millis();
         WiFi.begin(ssid, password);
         
-        // Wait for connection with shorter timeout to avoid AP disruption
+        // Wait for connection with reduced timeout to minimize AP disruption
         int connectionAttempts = 0;
-        const int maxAttempts = 15; // Reduced to 7.5 seconds max
+        const int maxAttempts = 10; // Reduced to 5 seconds max to minimize AP disruption
         
         while (WiFi.status() != WL_CONNECTED && connectionAttempts < maxAttempts) {
             delay(500);
@@ -197,13 +228,14 @@ void setupWiFi() {
                 // Clear bad credentials
                 clearWiFiCredentials();
                 
-                // Disconnect STA and go back to AP-only mode for stability
+                // Immediately return to AP-only mode for stability
                 WiFi.disconnect(true);
+                delay(500);
                 WiFi.mode(WIFI_AP);
                 delay(1000);
                 
                 // Restart AP to ensure it's stable
-                WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
+                WiFi.softAP(ap_ssid, ap_password, 6, 0, 8);
                 Serial.println("AP mode restored after credential failure");
                 break;
             }
@@ -211,14 +243,16 @@ void setupWiFi() {
         
         if (WiFi.status() == WL_CONNECTED) {
             Serial.println("\nConnected to STA with IP: " + WiFi.localIP().toString());
-            Serial.println("Running in dual AP+STA mode");
+            Serial.println("Running in dual AP+STA mode - AP should remain accessible");
         } else {
-            Serial.println("\nSTA connection timeout. Running AP-only mode for stability.");
-            // Ensure we're back in AP-only mode
+            Serial.println("\nSTA connection timeout. Returning to AP-only mode for maximum stability.");
+            // Return to AP-only mode for stability
             WiFi.disconnect(true);
+            delay(500);
             WiFi.mode(WIFI_AP);
             delay(1000);
-            WiFi.softAP(ap_ssid, ap_password, 6, 0, 4);
+            WiFi.softAP(ap_ssid, ap_password, 6, 0, 8);
+            Serial.println("AP-only mode restored for stability");
         }
     } else {
         Serial.println("No stored WiFi credentials. AP mode only.");
@@ -227,7 +261,14 @@ void setupWiFi() {
     // Setup mDNS after WiFi is stable
     setupmDNS();
     
-    Serial.println("WiFi setup complete. AP mode: " + String(ap_ssid) + " is always available.");
+    Serial.println("WiFi setup complete.");
+    Serial.println("=== CONNECTION INFO ===");
+    Serial.println("AP SSID: " + String(ap_ssid));
+    Serial.println("AP IP: 192.168.4.1 (always available)");
+    Serial.println("Hostname: weighmybru.local");
+    Serial.println("Max clients: 8");
+    Serial.println("WiFi sleep: disabled");
+    Serial.println("=======================");
 }
 
 void setupmDNS() {
@@ -260,5 +301,33 @@ void printWiFiStatus() {
         Serial.println("STA IP: " + WiFi.localIP().toString());
         Serial.println("STA RSSI: " + String(WiFi.RSSI()) + " dBm");
     }
+    Serial.println("WiFi Sleep: " + String(WiFi.getSleep() ? "ON" : "OFF"));
     Serial.println("==================");
+}
+
+void maintainWiFi() {
+    static unsigned long lastMaintenance = 0;
+    const unsigned long maintenanceInterval = 60000; // Every 60 seconds
+    
+    if (millis() - lastMaintenance >= maintenanceInterval) {
+        lastMaintenance = millis();
+        
+        // Check if AP is still running
+        if (WiFi.getMode() == WIFI_OFF || WiFi.getMode() == WIFI_STA) {
+            Serial.println("WARNING: AP mode lost! Restarting AP...");
+            WiFi.mode(WIFI_AP);
+            delay(500);
+            WiFi.softAP(ap_ssid, ap_password, 6, 0, 8);
+            Serial.println("AP mode restored");
+        }
+        
+        // Ensure WiFi sleep stays disabled
+        if (WiFi.getSleep()) {
+            Serial.println("WARNING: WiFi sleep was re-enabled! Disabling...");
+            WiFi.setSleep(false);
+        }
+        
+        // Print status for debugging
+        Serial.println("WiFi maintenance check completed");
+    }
 }

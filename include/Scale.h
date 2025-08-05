@@ -7,7 +7,7 @@
 class Scale {
 public:
     Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor);
-    void begin();
+    bool begin();  // Returns true if successful, false if HX711 fails
     void tare(uint8_t times = 20);
     void set_scale(float factor);
     float getWeight();
@@ -16,6 +16,7 @@ public:
     void saveCalibration(); // Save calibration factor to NVS
     void loadCalibration(); // Load calibration factor from NVS
     float getCalibrationFactor() const { return calibrationFactor; } // Getter for API
+    bool isHX711Connected() const { return isConnected; } // Check if HX711 is responding
     
     // Filtering configuration - adjustable for different load cells
     void setBrewingThreshold(float threshold);
@@ -38,6 +39,7 @@ private:
     uint8_t clockPin;
     float calibrationFactor = 0.0f;
     float currentWeight;
+    bool isConnected = false;  // Track HX711 connection status
     
     // Smart filtering variables
     static const int MAX_SAMPLES = 50;

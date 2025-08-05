@@ -31,11 +31,16 @@ PowerManager powerManager(sleepTouchPin, &oledDisplay);
 void setup() {
   Serial.begin(115200);
   
-  // Initialize display FIRST for immediate visual feedback
-  if (!oledDisplay.begin()) {
-    Serial.println("Display initialization failed!");
+  // Initialize display with error handling - don't block if display fails
+  Serial.println("Initializing display...");
+  bool displayAvailable = oledDisplay.begin();
+  
+  if (!displayAvailable) {
+    Serial.println("WARNING: Display initialization failed!");
+    Serial.println("System will continue in headless mode without display.");
+    Serial.println("All functionality remains available via web interface.");
   } else {
-    Serial.println("Display initialized - ready for messages");
+    Serial.println("Display initialized - ready for visual feedback");
   }
   
   // Check wake-up reason and show appropriate message
@@ -64,16 +69,28 @@ void setup() {
 
   setupWiFi();
 
-  scale.begin();
+  // Initialize scale with error handling - don't block web server if HX711 fails
+  Serial.println("Initializing scale...");
+  if (!scale.begin()) {
+    Serial.println("WARNING: Scale (HX711) initialization failed!");
+    Serial.println("Web server will continue to run, but scale readings will not be available.");
+    Serial.println("Check HX711 wiring and connections.");
+  } else {
+    Serial.println("Scale initialized successfully");
+  }
   
   // Initialize Bluetooth scale
   bluetoothScale.begin(&scale);
   
-  // Set bluetooth reference in display for status indicator
-  oledDisplay.setBluetoothScale(&bluetoothScale);
+  // Set bluetooth reference in display for status indicator (if display available)
+  if (oledDisplay.isConnected()) {
+    oledDisplay.setBluetoothScale(&bluetoothScale);
+  }
   
-  // Set power manager reference in display for timer state synchronization
-  oledDisplay.setPowerManager(&powerManager);
+  // Set power manager reference in display for timer state synchronization (if display available)
+  if (oledDisplay.isConnected()) {
+    oledDisplay.setPowerManager(&powerManager);
+  }
 
   // Initialize touch sensor
   touchSensor.begin();
@@ -81,12 +98,16 @@ void setup() {
   // Initialize power manager
   powerManager.begin();
 
-  // Show IP addresses and welcome message now that everything is ready
+  // Show IP addresses and welcome message if display is available
   delay(100); // Small delay to ensure WiFi is fully initialized
-  oledDisplay.showIPAddresses();
+  if (oledDisplay.isConnected()) {
+    oledDisplay.showIPAddresses();
+  }
 
-  // Link display to touch sensor for tare feedback
-  touchSensor.setDisplay(&oledDisplay);
+  // Link display to touch sensor for tare feedback (if display available)
+  if (oledDisplay.isConnected()) {
+    touchSensor.setDisplay(&oledDisplay);
+  }
 
   setupWebServer(scale, flowRate, bluetoothScale, oledDisplay);
 }
@@ -107,6 +128,9 @@ void loop() {
     printWiFiStatus();
     lastWiFiCheck = millis();
   }
+  
+  // Maintain WiFi AP stability
+  maintainWiFi();
   
   // Update Bluetooth scale
   bluetoothScale.update();
