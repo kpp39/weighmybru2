@@ -2,11 +2,7 @@
 #define DISPLAY_H
 
 #include <Wire.h>
-#include <Adafruit_G    PowerManager* powerManagerPtr;
-    Adafruit_SSD1306* display;
-    bool displayConnected = false; // Track if display is actually connected
-    
-    static const int SCREEN_WIDTH = 128;>
+#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 class Scale; // Forward declaration
@@ -83,6 +79,7 @@ private:
     BluetoothScale* bluetoothPtr;
     PowerManager* powerManagerPtr;
     Adafruit_SSD1306* display;
+    bool displayConnected; // Track if display is actually connected
     
     static const uint8_t SCREEN_WIDTH = 128;
     static const uint8_t SCREEN_HEIGHT = 32;
