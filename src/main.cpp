@@ -31,6 +31,23 @@ PowerManager powerManager(sleepTouchPin, &oledDisplay);
 void setup() {
   Serial.begin(115200);
   
+  // Check for factory reset request (hold touch pin during boot)
+  pinMode(touchPin, INPUT_PULLDOWN);
+  if (digitalRead(touchPin) == HIGH) {
+    Serial.println("FACTORY RESET: Touch pin held during boot - clearing WiFi credentials");
+    clearWiFiCredentials();
+    delay(1000);
+  }
+  
+  // CRITICAL: Initialize BLE FIRST before WiFi to prevent radio conflicts
+  Serial.println("Initializing BLE FIRST for GaggiMate compatibility...");
+  try {
+    bluetoothScale.begin();  // Initialize BLE without scale reference
+    Serial.println("BLE initialized successfully - GaggiMate should be able to connect");
+  } catch (...) {
+    Serial.println("BLE initialization failed - continuing without Bluetooth");
+  }
+  
   // Initialize display with error handling - don't block if display fails
   Serial.println("Initializing display...");
   bool displayAvailable = oledDisplay.begin();
@@ -69,6 +86,9 @@ void setup() {
 
   setupWiFi();
 
+  // Wait for WiFi to fully stabilize after BLE is already running
+  delay(3000);
+
   // Initialize scale with error handling - don't block web server if HX711 fails
   Serial.println("Initializing scale...");
   if (!scale.begin()) {
@@ -77,10 +97,12 @@ void setup() {
     Serial.println("Check HX711 wiring and connections.");
   } else {
     Serial.println("Scale initialized successfully");
+    // Now that scale is ready, set the reference in BluetoothScale
+    bluetoothScale.setScale(&scale);
   }
   
-  // Initialize Bluetooth scale
-  bluetoothScale.begin(&scale);
+  // BLE was initialized earlier - no need to initialize again
+  // bluetoothScale.begin(&scale);
   
   // Set bluetooth reference in display for status indicator (if display available)
   if (oledDisplay.isConnected()) {
@@ -132,7 +154,7 @@ void loop() {
   // Maintain WiFi AP stability
   maintainWiFi();
   
-  // Update Bluetooth scale
+  // Update Bluetooth for GaggiMate connectivity
   bluetoothScale.update();
   
   // Update touch sensor

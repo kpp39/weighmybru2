@@ -9,9 +9,10 @@ TouchSensor::TouchSensor(uint8_t touchPin, Scale* scale)
 }
 
 void TouchSensor::begin() {
-    // Set up the pin as digital input for the touch sensor module
-    pinMode(touchPin, INPUT);
-    Serial.println("Digital touch sensor initialized on pin " + String(touchPin));
+    // Set up the pin as digital input with pull-down resistor for the touch sensor module
+    // This prevents false triggers when no touch sensor is connected
+    pinMode(touchPin, INPUT_PULLDOWN);
+    Serial.println("Digital touch sensor initialized on pin " + String(touchPin) + " with pull-down resistor");
 }
 
 void TouchSensor::update() {
@@ -67,7 +68,16 @@ uint16_t TouchSensor::getTouchValue() {
 bool TouchSensor::isTouched() {
     // For digital touch sensor modules, check if the pin is HIGH
     // Most touch sensor modules output HIGH when touched
-    return digitalRead(touchPin) == HIGH;
+    bool touched = digitalRead(touchPin) == HIGH;
+    
+    // Debug: log unexpected HIGH readings when no sensor should be connected
+    static unsigned long lastDebugTime = 0;
+    if (touched && millis() - lastDebugTime > 5000) { // Log every 5 seconds max
+        Serial.println("DEBUG: Touch pin GPIO" + String(touchPin) + " reading HIGH - check for floating pin or connected sensor");
+        lastDebugTime = millis();
+    }
+    
+    return touched;
 }
 
 void TouchSensor::setDisplay(Display* display) {

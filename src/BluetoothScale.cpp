@@ -361,3 +361,13 @@ void BluetoothScale::onWrite(BLECharacteristic* pCharacteristic) {
         processIncomingMessage(data, length);
     }
 }
+
+// Overloaded begin method for early initialization
+void BluetoothScale::begin() {
+    begin(nullptr);  // Initialize without scale reference
+}
+
+void BluetoothScale::setScale(Scale* scaleInstance) {
+    scale = scaleInstance;
+    Serial.println("BluetoothScale: Scale reference set");
+}
