@@ -10,15 +10,16 @@ PowerManager::PowerManager(uint8_t sleepTouchPin, Display* display)
 }
 
 void PowerManager::begin() {
-    // Set up the pin as digital input for the digital touch sensor module
-    pinMode(sleepTouchPin, INPUT);
+    // Set up the pin as digital input with pull-down resistor for the digital touch sensor module
+    // This prevents false triggers when no touch sensor is connected
+    pinMode(sleepTouchPin, INPUT_PULLDOWN);
     
     // Configure external wake-up on the touch pin
     // Wake up when pin goes HIGH (touch sensor outputs HIGH when touched)
     esp_sleep_enable_ext0_wakeup((gpio_num_t)sleepTouchPin, 1);
     
     Serial.println("Power Manager initialized. Sleep touch sensor on GPIO" + String(sleepTouchPin));
-    Serial.println("Using EXT0 wake-up (digital touch sensor)");
+    Serial.println("Using EXT0 wake-up (digital touch sensor) with pull-down resistor");
     Serial.println("Device will wake up when touch sensor outputs HIGH");
 }
 
@@ -137,7 +138,16 @@ void PowerManager::setSleepTouchThreshold(uint16_t threshold) {
 
 bool PowerManager::isSleepTouchPressed() {
     // For digital touch sensor modules, check if the pin is HIGH
-    return digitalRead(sleepTouchPin) == HIGH;
+    bool pressed = digitalRead(sleepTouchPin) == HIGH;
+    
+    // Debug: log unexpected HIGH readings when no sensor should be connected
+    static unsigned long lastDebugTime = 0;
+    if (pressed && millis() - lastDebugTime > 5000) { // Log every 5 seconds max
+        Serial.println("DEBUG: Sleep touch pin GPIO" + String(sleepTouchPin) + " reading HIGH - check for floating pin or connected sensor");
+        lastDebugTime = millis();
+    }
+    
+    return pressed;
 }
 
 void PowerManager::setDisplay(Display* display) {
