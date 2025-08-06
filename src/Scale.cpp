@@ -162,8 +162,18 @@ float Scale::getWeight() {
     readings[readingIndex] = rawReading;
     readingIndex = (readingIndex + 1) % MAX_SAMPLES;
     
-    // Simple average filter for stability
-    currentWeight = averageFilter(averageSamples);
+    // Detect rapid weight changes for faster response
+    float weightChange = abs(rawReading - currentWeight);
+    
+    if (weightChange > 5.0f) {  // Rapid change detected (>5g difference)
+        // Clear buffer and reinitialize with new reading for immediate response
+        initializeSamples(rawReading);
+        currentWeight = rawReading;
+    } else {
+        // Normal filtering for stable readings
+        currentWeight = averageFilter(averageSamples);
+    }
+    
     return currentWeight;
 }
 

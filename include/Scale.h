@@ -41,8 +41,8 @@ private:
     float currentWeight;
     bool isConnected = false;  // Track HX711 connection status
     
-    // Smart filtering variables
-    static const int MAX_SAMPLES = 50;
+    // Smart filtering variables - reduced buffer for faster response
+    static const int MAX_SAMPLES = 10;  // Reduced from 50 to 10 for faster response
     float readings[MAX_SAMPLES];
     int readingIndex = 0;
     bool samplesInitialized = false;
