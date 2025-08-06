@@ -5,7 +5,7 @@
 TouchSensor::TouchSensor(uint8_t touchPin, Scale* scale) 
     : touchPin(touchPin), scalePtr(scale), displayPtr(nullptr), touchThreshold(30000), 
       lastTouchState(false), lastTouchTime(0), touchStartTime(0), debounceDelay(200),
-      longPressDetected(false) {
+      longPressDetected(false), delayedTarePending(false), delayedTareTime(0) {
 }
 
 void TouchSensor::begin() {
@@ -30,8 +30,8 @@ void TouchSensor::update() {
             } else {
                 // Touch ended
                 if (!longPressDetected) {
-                    // Short press - trigger tare
-                    handleTouch();
+                    // Short press - schedule delayed tare to allow scale to stabilize
+                    scheduleDelayedTare();
                 } else {
                     // Touch ended after long press - complete any pending mode tare
                     if (displayPtr != nullptr) {
@@ -53,6 +53,9 @@ void TouchSensor::update() {
             handleLongPress();
         }
     }
+    
+    // Check for pending delayed tare
+    checkDelayedTare();
 }
 
 void TouchSensor::setTouchThreshold(uint16_t threshold) {
@@ -124,5 +127,50 @@ void TouchSensor::handleLongPress() {
         Serial.println("Mode switched with delayed tare");
     } else {
         Serial.println("Error: Display pointer is null");
+    }
+}
+
+void TouchSensor::scheduleDelayedTare() {
+    Serial.println("Touch detected - showing taring message immediately");
+    
+    // Show taring message immediately for better user feedback
+    if (displayPtr != nullptr) {
+        displayPtr->showTaringMessage();
+        Serial.println("Taring message displayed");
+    }
+    
+    Serial.println("Scheduling delayed tare in 1.5 seconds...");
+    delayedTarePending = true;
+    delayedTareTime = millis() + TARE_DELAY;
+}
+
+void TouchSensor::checkDelayedTare() {
+    if (delayedTarePending && millis() >= delayedTareTime) {
+        Serial.println("Executing delayed tare operation");
+        delayedTarePending = false;
+        
+        // Perform the actual tare operation without showing message again
+        if (scalePtr != nullptr) {
+            scalePtr->tare();
+            Serial.println("Scale tared successfully");
+            
+            // Reset timer when manual tare is pressed
+            if (displayPtr != nullptr) {
+                displayPtr->resetTimer();
+                Serial.println("Timer reset with manual tare");
+            }
+            
+            // Reset auto sequence if in Auto mode
+            if (displayPtr != nullptr) {
+                displayPtr->resetAutoSequence();
+            }
+            
+            // Show completion message on display if available
+            if (displayPtr != nullptr) {
+                displayPtr->showTaredMessage();
+            }
+        } else {
+            Serial.println("Error: Scale pointer is null");
+        }
     }
 }

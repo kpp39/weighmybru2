@@ -27,7 +27,14 @@ private:
     unsigned long debounceDelay;
     bool longPressDetected;
     
+    // Delayed tare functionality for mounted touch sensors
+    bool delayedTarePending;
+    unsigned long delayedTareTime;
+    static const unsigned long TARE_DELAY = 1500; // 1.5 seconds delay after touch release
+    
     void handleTouch();
+    void scheduleDelayedTare();
+    void checkDelayedTare();
     void handleLongPress();
 };
 
