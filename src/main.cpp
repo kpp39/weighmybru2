@@ -101,7 +101,20 @@ void setup() {
 
   // Wait for WiFi to fully stabilize after BLE is already running
   delay(1500);
-  Serial.printf("Version: %s\n", ESP.getSdkVersion());
+  
+  // Diagnostic information for Bluetooth compatibility troubleshooting
+  Serial.println("=== BLUETOOTH DIAGNOSTICS ===");
+  Serial.printf("ESP-IDF Version: %s\n", esp_get_idf_version());
+  Serial.printf("Arduino SDK Version: %s\n", ESP.getSdkVersion());
+  Serial.printf("Chip Model: %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
+  Serial.printf("CPU Frequency: %d MHz\n", ESP.getCpuFreqMHz());
+  Serial.printf("Flash Size: %d KB\n", ESP.getFlashChipSize() / 1024);
+  Serial.printf("Flash Speed: %d Hz\n", ESP.getFlashChipSpeed());
+  Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+  Serial.printf("PSRAM Size: %d bytes\n", ESP.getPsramSize());
+  Serial.printf("MAC Address: %s\n", WiFi.macAddress().c_str());
+  Serial.println("==============================");
+  
   // Initialize scale with error handling - don't block web server if HX711 fails
   Serial.println("Initializing scale...");
   if (!scale.begin()) {
