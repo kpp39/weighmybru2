@@ -104,18 +104,6 @@ void BluetoothScale::initializeBLE() {
     // Initialize BLE Device with WeighMyBru name - this handles the low-level BLE stack
     BLEDevice::init("WeighMyBru");
     
-    // BLE Stack Diagnostics for GaggiMate compatibility troubleshooting
-    Serial.println("=== BLE STACK DIAGNOSTICS ===");
-    Serial.printf("BLE Device Name: %s\n", BLEDevice::toString().c_str());
-    Serial.printf("BLE Device Address: %s\n", BLEDevice::getAddress().toString().c_str());
-    
-    // Get BLE power levels
-    esp_power_level_t adv_power = esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_ADV);
-    esp_power_level_t conn_power = esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_CONN_HDL0);
-    Serial.printf("BLE Advertising Power: %d dBm\n", adv_power);
-    Serial.printf("BLE Connection Power: %d dBm\n", conn_power);
-    Serial.println("==============================");
-    
     // Set moderate power to reduce current draw during boot while maintaining connectivity
     BLEDevice::setPower(ESP_PWR_LVL_N0);  // Moderate BLE power reduction (0dBm)
     

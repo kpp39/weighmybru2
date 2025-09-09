@@ -3,6 +3,7 @@
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <esp_sleep.h>
+#include <BLEDevice.h>
 #include "WebServer.h"
 #include "Scale.h"
 #include "WiFiManager.h"
@@ -126,6 +127,18 @@ void setup() {
     // Now that scale is ready, set the reference in BluetoothScale
     bluetoothScale.setScale(&scale);
   }
+  
+  // Print BLE diagnostics now that everything is initialized
+  Serial.println("=== BLE STACK DIAGNOSTICS ===");
+  Serial.printf("BLE Device Name: WeighMyBru\n");
+  Serial.printf("BLE Device Address: %s\n", BLEDevice::getAddress().toString().c_str());
+  
+  // Get current BLE power levels
+  esp_power_level_t adv_power = esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_ADV);
+  esp_power_level_t conn_power = esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_CONN_HDL0);
+  Serial.printf("BLE Advertising Power: %d dBm\n", adv_power);
+  Serial.printf("BLE Connection Power: %d dBm\n", conn_power);
+  Serial.println("==============================");
   
   // BLE was initialized earlier - no need to initialize again
   // bluetoothScale.begin(&scale);
