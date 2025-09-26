@@ -738,23 +738,23 @@ void Display::showWeightWithFlowAndTimer(float weight) {
     String intStr = String(integerPart);
     display->setCursor(currentX, weightY);
     display->print(intStr);
-    
-    // Calculate position after integer part
-    display->getTextBounds(intStr, 0, 0, &x1, &y1, &w, &h);
-    currentX += w;
-    
-    // Draw smaller decimal point (size 1) positioned to align with baseline
-    display->setTextSize(1);
-    display->setCursor(currentX, weightY + 11); // Offset from weight baseline for alignment
-    display->print(".");
-    display->getTextBounds(".", 0, 0, &x1, &y1, &w, &h);
-    currentX += w;
-    
-    // Draw decimal digit in size 2 for better readability
-    display->setTextSize(2);
-    display->setCursor(currentX, weightY + 3); // Positioned relative to weight baseline
-    display->print(String(decimalPart));
-    
+    if (!isNegative && integerPart < 100){
+        // Calculate position after integer part
+        display->getTextBounds(intStr, 0, 0, &x1, &y1, &w, &h);
+        currentX += w;
+        
+        // Draw smaller decimal point (size 1) positioned to align with baseline
+        display->setTextSize(1);
+        display->setCursor(currentX, weightY + 11); // Offset from weight baseline for alignment
+        display->print(".");
+        display->getTextBounds(".", 0, 0, &x1, &y1, &w, &h);
+        currentX += w;
+        
+        // Draw decimal digit in size 2 for better readability
+        display->setTextSize(2);
+        display->setCursor(currentX, weightY + 3); // Positioned relative to weight baseline
+        display->print(String(decimalPart));
+    }
     // Right side: Timer and flow rate stacked (size 2)
     display->setTextSize(2);
     
