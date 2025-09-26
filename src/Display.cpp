@@ -992,6 +992,10 @@ void Display::showStatusPage() {
     if (!displayConnected) {
         return;
     }
+    // If we're showing a message, don't override it with status page
+    if (showingMessage) {
+        return;
+    }
 
     display->clearDisplay();
     display->setTextColor(SSD1306_WHITE);
