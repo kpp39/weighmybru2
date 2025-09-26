@@ -1069,3 +1069,13 @@ unsigned long Display::getElapsedTime() const {
         return millis() - timerStartTime;
     }
 }
+
+void  Display::sleep () {
+    if(!displayConnected) {
+        return;
+    }
+    Serial.println("Sending display to sleep...");
+    display->ssd1306_command(SSD1306_DISPLAYOFF);
+    Serial.println("Display sent to sleep!");
+
+}
