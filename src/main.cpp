@@ -13,6 +13,7 @@
 #include "Display.h"
 #include "PowerManager.h"
 #include "BatteryMonitor.h"
+#include <FreeRTOS.h>
 
 // Pins and calibration
 uint8_t dataPin = 5;   // HX711 Data pin (moved from 12)
@@ -30,7 +31,42 @@ TouchSensor touchSensor(touchPin, &scale);
 Display oledDisplay(sdaPin, sclPin, &scale, &flowRate);
 PowerManager powerManager(sleepTouchPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
+void uiUpdate(void * parameter){
+  TickType_t lastTick = xTaskGetTickCount();
+  for(;;){
+    touchSensor.update();
+    powerManager.update();
+    batteryMonitor.update();
+    oledDisplay.update();
+    xTaskDelayUntil(&lastTick, 25 / portTICK_PERIOD_MS);
+  }
+}
 
+
+
+void weightUpdate(void * parameter){
+  TickType_t lastTick = xTaskGetTickCount();
+  for(;;){
+    float weight = scale.getWeight();
+    flowRate.update(weight);
+    xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
+  }
+}
+void bleUpdate(void * parameter){
+  TickType_t lastTick = xTaskGetTickCount();
+  for(;;){
+    bluetoothScale.update();
+    xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
+  }
+}
+void checkWiFiStatus(void * parameter){
+  TickType_t lastTick = xTaskGetTickCount();
+  for(;;){
+    float weight = scale.getWeight();
+    flowRate.update(weight);
+    xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
+  }
+}
 void setup() {
   Serial.begin(115200);
   
@@ -165,48 +201,48 @@ void setup() {
   touchSensor.setFlowRate(&flowRate);
 
   setupWebServer(scale, flowRate, bluetoothScale, oledDisplay, batteryMonitor);
+  xTaskCreate (
+    weightUpdate,
+    "Weight update",
+    10000,
+    NULL,
+    1,
+    NULL
+  );
+  xTaskCreate (
+    bleUpdate,
+    "Update Bluetooth",
+    10000,
+    NULL,
+    1,
+    NULL
+  );
+  
+  xTaskCreate (
+    printWiFiStatus,
+    "Check WiFi status",
+    10000,
+    NULL,
+    1,
+    NULL
+  );
+  xTaskCreate (
+    maintainWiFi,
+    "Maintain WiFi AP stability",
+    10000,
+    NULL,
+    1,
+    NULL
+  );
+   xTaskCreate (
+    uiUpdate,
+    "UI update",
+    10000,
+    NULL,
+    1,
+    NULL
+  );
 }
 
-void loop() {
-  static unsigned long lastWeightUpdate = 0;
-  static unsigned long lastWiFiCheck = 0;
-  
-  // Update weight at optimal frequency for brewing accuracy
-  if (millis() - lastWeightUpdate >= 20) { // Update every 20ms (50Hz) - still very responsive
-    float weight = scale.getWeight();
-    flowRate.update(weight);
-    lastWeightUpdate = millis();
-  }
-  
-  static unsigned long lastBLEUpdate = 0;
-  
-  // Check WiFi status every 30 seconds for debugging
-  if (millis() - lastWiFiCheck >= 30000) {
-    printWiFiStatus();
-    lastWiFiCheck = millis();
-  }
-  
-  // Maintain WiFi AP stability
-  maintainWiFi();
-  
-  // Update Bluetooth less frequently to reduce BLE interference
-  if (millis() - lastBLEUpdate >= 50) { // Update every 50ms (20Hz) - sufficient for app responsiveness
-    bluetoothScale.update();
-    lastBLEUpdate = millis();
-  }
-  
-  // Update touch sensor
-  touchSensor.update();
-  
-  // Update power manager
-  powerManager.update();
-  
-  // Update battery monitor
-  batteryMonitor.update();
-  
-  // Update display
-  oledDisplay.update();
-  
-  // Balanced delay for responsive readings without system overload
-  delay(25); // Increased from 5ms to 25ms to reduce BLE interference and system load
-}
+void loop() {}
+
