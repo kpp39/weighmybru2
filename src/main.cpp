@@ -14,6 +14,7 @@
 #include "PowerManager.h"
 #include "BatteryMonitor.h"
 #include <FreeRTOS.h>
+#include <esp_pm.h>
 
 // Pins and calibration
 uint8_t dataPin = 5;   // HX711 Data pin (moved from 12)
@@ -242,6 +243,13 @@ void setup() {
     1,
     NULL
   );
+  esp_pm_config_esp32s3_t pm_config = {
+        .max_freq_mhz = 240, // Maximum CPU frequency when needed
+        .min_freq_mhz = 80,  // Minimum CPU frequency when idle
+        .light_sleep_enable = true // Enable automatic light sleep
+    };
+  esp_pm_configure(&pm_config);
+
 }
 
 void loop() {}

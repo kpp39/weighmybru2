@@ -332,7 +332,7 @@ void maintainWiFi(void * parameter) {
     for(;;){
         if (isWiFiEnabled()) {     
         // if (millis() - lastMaintenance >= maintenanceInterval) {
-            lastMaintenance = millis();
+            // lastMaintenance = millis();
 
             // Check current WiFi mode and connection health
             wifi_mode_t currentMode = WiFi.getMode();
