@@ -3,7 +3,7 @@
 #include <Preferences.h>
 #include <ESPmDNS.h>
 #include "WebServer.h"  // For web server control
-#include <FreeRTOS.h>
+// #include <FreeRTOS.h>
 
 // ESP-IDF includes for advanced WiFi power management (SuperMini antenna fix)
 #ifdef ESP_IDF_VERSION_MAJOR
@@ -35,7 +35,8 @@ static wifi_mode_t previousWiFiMode = WIFI_OFF; // Store previous mode when disa
 
 unsigned long startAttemptTime = 0;
 const unsigned long timeout = 10000; // 10 seconds
-
+void startWebServer();
+void stopWebServer();
 void saveWiFiCredentials(const char* ssid, const char* password) {
     Serial.println("Saving WiFi credentials...");
     unsigned long startTime = millis();
@@ -328,7 +329,7 @@ void printWiFiStatus(void * parameter) {
 void maintainWiFi(void * parameter) {
     // Skip maintenance if WiFi is disabled
     TickType_t lastMaintenance = xTaskGetTickCount();
-    // const TickType_t maintenanceInterval = ; // Every 15 seconds for more responsive switching
+    const TickType_t maintenanceInterval = 15000/portTICK_PERIOD_MS; // Every 15 seconds for more responsive switching
     for(;;){
         if (isWiFiEnabled()) {     
         // if (millis() - lastMaintenance >= maintenanceInterval) {
@@ -395,7 +396,7 @@ void maintainWiFi(void * parameter) {
             // Print status for debugging
             Serial.println("WiFi maintenance check completed");
         }
-        xTaskDelayUntil(&lastMaintenance, 15000/portTICK_PERIOD_MS);
+        xTaskDelayUntil(&lastMaintenance, maintenanceInterval);
     }    
 }
 

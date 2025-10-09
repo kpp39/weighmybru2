@@ -1,4 +1,3 @@
-#include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include "WebServer.h"
 #include "Scale.h"
@@ -7,6 +6,9 @@
 #include "FlowRate.h"
 #include "Calibration.h"
 #include "BluetoothScale.h"
+#include "BatteryMonitor.h"
+#include "Display.h"
+#include <ESPAsyncWebServer.h>
 
 Preferences preferences;
 

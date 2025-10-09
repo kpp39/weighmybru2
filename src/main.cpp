@@ -1,11 +1,88 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_task_wdt.h"
+#include "Arduino.h"
+#if (ARDUINO_USB_CDC_ON_BOOT|ARDUINO_USB_MSC_ON_BOOT|ARDUINO_USB_DFU_ON_BOOT) && !ARDUINO_USB_MODE
+#include "USB.h"
+#if ARDUINO_USB_MSC_ON_BOOT
+#include "FirmwareMSC.h"
+#endif
+#endif
+
+
+#ifndef ARDUINO_LOOP_STACK_SIZE
+#ifndef CONFIG_ARDUINO_LOOP_STACK_SIZE
+#define ARDUINO_LOOP_STACK_SIZE 8192
+#else
+#define ARDUINO_LOOP_STACK_SIZE CONFIG_ARDUINO_LOOP_STACK_SIZE
+#endif
+#endif
+
+TaskHandle_t loopTaskHandle = NULL;
+
+#if CONFIG_AUTOSTART_ARDUINO
+#if CONFIG_FREERTOS_UNICORE
+void yieldIfNecessary(void){
+    static uint64_t lastYield = 0;
+    uint64_t now = millis();
+    if((now - lastYield) > 2000) {
+        lastYield = now;
+        vTaskDelay(5); //delay 1 RTOS tick
+    }
+}
+#endif
+
+bool loopTaskWDTEnabled;
+
+__attribute__((weak)) size_t getArduinoLoopTaskStackSize(void) {
+    return ARDUINO_LOOP_STACK_SIZE;
+}
+
+void loopTask(void *pvParameters)
+{
+    setup();
+    for(;;) {
+#if CONFIG_FREERTOS_UNICORE
+        yieldIfNecessary();
+#endif
+        if(loopTaskWDTEnabled){
+            esp_task_wdt_reset();
+        }
+        loop();
+        if (serialEventRun) serialEventRun();
+    }
+}
+
+extern "C" void app_main()
+{
+#if ARDUINO_USB_CDC_ON_BOOT && !ARDUINO_USB_MODE
+    Serial.begin();
+#endif
+#if ARDUINO_USB_MSC_ON_BOOT && !ARDUINO_USB_MODE
+    MSC_Update.begin();
+#endif
+#if ARDUINO_USB_DFU_ON_BOOT && !ARDUINO_USB_MODE
+    USB.enableDFU();
+#endif
+#if ARDUINO_USB_ON_BOOT && !ARDUINO_USB_MODE
+    USB.begin();
+#endif
+    loopTaskWDTEnabled = false;
+    initArduino();
+    xTaskCreateUniversal(loopTask, "loopTask", getArduinoLoopTaskStackSize(), NULL, 1, &loopTaskHandle, ARDUINO_RUNNING_CORE);
+}
+
+#endif
+
+
 #include <WiFi.h>
-#include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <esp_sleep.h>
 #include "WebServer.h"
 #include "Scale.h"
 #include "WiFiManager.h"
+#include <ESPAsyncWebServer.h>
 #include "FlowRate.h"
 #include "Calibration.h"
 #include "BluetoothScale.h"
@@ -13,7 +90,6 @@
 #include "Display.h"
 #include "PowerManager.h"
 #include "BatteryMonitor.h"
-#include <FreeRTOS.h>
 #include <esp_pm.h>
 
 // Pins and calibration
@@ -68,6 +144,7 @@ void checkWiFiStatus(void * parameter){
     xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
   }
 }
+void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale, Display &display, BatteryMonitor &battery);
 void setup() {
   Serial.begin(115200);
   
@@ -246,11 +323,13 @@ void setup() {
   esp_pm_config_esp32s3_t pm_config = {
         .max_freq_mhz = 240, // Maximum CPU frequency when needed
         .min_freq_mhz = 80,  // Minimum CPU frequency when idle
-        .light_sleep_enable = true // Enable automatic light sleep
+        .light_sleep_enable = false // Enable automatic light sleep
     };
-  esp_pm_configure(&pm_config);
+  // esp_pm_configure(&pm_config);
+  ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 
 }
 
-void loop() {}
+void loop() {vTaskDelay(250);}
+// void loop() {vTaskDelete(NULL);}
 
