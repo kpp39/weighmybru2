@@ -1,9 +1,9 @@
 #include <WiFi.h>
+#include "WebServer.h"
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <esp_sleep.h>
-#include "WebServer.h"
 #include "Scale.h"
 #include "WiFiManager.h"
 #include "FlowRate.h"
@@ -30,7 +30,7 @@ TouchSensor touchSensor(touchPin, &scale);
 Display oledDisplay(sdaPin, sclPin, &scale, &flowRate);
 PowerManager powerManager(sleepTouchPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
-
+void setupWebServer(Scale &scale, FlowRate &flowRate, BluetoothScale &bluetoothScale, Display &display, BatteryMonitor &battery);
 void setup() {
   Serial.begin(115200);
   
