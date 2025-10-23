@@ -194,12 +194,12 @@ void BluetoothScale::initializeBLE() {
     advertising->addServiceUUID(SERVICE_UUID);
     
     // Enable scan response to allow full device name in advertising
-    advertising->setScanResponse(true);
+    advertising->enableScanResponse(true);
     
     // Explicitly set the advertising name to ensure full "WeighMyBru" appears
     advertising->setName("WeighMyBru");
     
-    advertising->setMinPreferred(0x0);
+    advertising->setPreferredParams(0x0, 0x0);
     
     Serial.println("BluetoothScale: BLE initialization completed successfully");
 }
@@ -497,19 +497,19 @@ void BluetoothScale::processIncomingMessage(uint8_t* data, size_t length) {
 }
 
 // BLE Server Callbacks
-void BluetoothScale::onConnect(NimBLEServer* pServer) {
+void BluetoothScale::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
     deviceConnected = true;
     NimBLEDevice::stopAdvertising();
     Serial.println("BluetoothScale: Device connected");
 }
 
-void BluetoothScale::onDisconnect(NimBLEServer* pServer) {
+void BluetoothScale::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
     deviceConnected = false;
     Serial.println("BluetoothScale: Device disconnected");
 }
 
 // BLE Characteristic Callbacks
-void BluetoothScale::onWrite(NimBLECharacteristic* pCharacteristic) {
+void BluetoothScale::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
     std::string value = pCharacteristic->getValue();
     
     if (value.length() > 0) {
