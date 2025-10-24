@@ -1,2 +1,0 @@
-idf_component_register( SRCS "BatteryMonitor.cpp" "BluetoothScale.cpp" "Display.cpp" "FlowRate.cpp" "PowerManager.cpp" "Scale.cpp" "TouchSensor.cpp" "WiFiManager.cpp" "WebServer.cpp" "main.cpp" 
-                        INCLUDE_DIRS "./../include")
