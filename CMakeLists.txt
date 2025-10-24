@@ -1,6 +1,0 @@
-cmake_minimum_required(VERSION 3.16.0)
-include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(weighmybru2)
-add_compile_options(-DBOARD_HAS_PSRAM=1)
-add_compile_options(-DARDUINO_USB_CDC_ON_BOOT=1)
-add_compile_options(-DCORE_DEBUG_LEVEL=0)

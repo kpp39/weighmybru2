@@ -68,6 +68,34 @@ void checkWiFiStatus(void * parameter){
     xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
   }
 }
+
+void TaskLog(void *pvParameters) {
+    static const int statsBufferSize = 1024;
+    static char statsBuffer[statsBufferSize];
+
+    static const int listBufferSize = 1024;
+    static char listBuffer[listBufferSize];
+
+    while (true) {
+        Serial.println("\n============ Task Stats ============");
+
+        // Get runtime stats for CPU usage
+        // This requires configGENERATE_RUN_TIME_STATS to be enabled
+        vTaskGetRunTimeStats(statsBuffer);
+        Serial.println("Run Time Stats:");
+        Serial.println(statsBuffer);
+
+        // Get task list with state, priority, stack, and task number
+        // Note: vTaskList output depends on configuration and may not include core affinities by default
+        // vTaskList(listBuffer);
+        // Serial.println("Task List:");
+        // Serial.println(listBuffer);
+
+        // Serial.println("=====================================");
+
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+} 
 void setup() {
   Serial.begin(115200);
   
@@ -204,7 +232,7 @@ void setup() {
   setupWebServer(scale, flowRate, bluetoothScale, oledDisplay, batteryMonitor);
   xTaskCreate (
     weightUpdate,
-    "Weight update",
+    "Weight upd",
     10000,
     NULL,
     1,
@@ -212,7 +240,7 @@ void setup() {
   );
   xTaskCreate (
     bleUpdate,
-    "Update Bluetooth",
+    "Update Bt",
     10000,
     NULL,
     1,
@@ -221,7 +249,7 @@ void setup() {
   
   xTaskCreate (
     printWiFiStatus,
-    "Check WiFi status",
+    "WiFi state",
     10000,
     NULL,
     1,
@@ -229,7 +257,7 @@ void setup() {
   );
   xTaskCreate (
     maintainWiFi,
-    "Maintain WiFi AP stability",
+    "WiFi Health",
     10000,
     NULL,
     1,
@@ -243,16 +271,23 @@ void setup() {
     1,
     NULL
   );
-  esp_pm_config_t pm_config = {
-        .max_freq_mhz = 240, // Maximum CPU frequency when needed
-        .min_freq_mhz = 80,  // Minimum CPU frequency when idle
-        .light_sleep_enable = true // Enable automatic light sleep
-    };
-  Serial.println("setting up power mode...");
-  ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
-  Serial.println("power mode set up...");
+  // xTaskCreate(
+  //       TaskLog,     // Функция задачи
+  //       "Log",       // Имя задачи
+  //       2048,        // Увеличили размер стека для доп. вычислений
+  //       NULL,        // Параметры задачи
+  //       1,           // Приоритет задачи
+  //       NULL
+  //   );
 
+  esp_pm_config_t pm_config = {
+      .max_freq_mhz = 240, // Maximum CPU frequency when needed
+      .min_freq_mhz = 80,  // Minimum CPU frequency when idle
+      .light_sleep_enable = true // Enable automatic light sleep
+  };
+  ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }
 
+// void loop() {}
 void loop() {vTaskDelay(100);}
 
