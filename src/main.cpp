@@ -31,7 +31,7 @@ FlowRate flowRate;
 BluetoothScale bluetoothScale;
 TouchSensor touchSensor(touchPin, &scale);
 Display oledDisplay(sdaPin, sclPin, &scale, &flowRate);
-PowerManager powerManager(sleepTouchPin, &oledDisplay, &scale);
+PowerManager powerManager(sleepTouchPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
 void uiUpdate(void * parameter){
   TickType_t lastTick = xTaskGetTickCount();

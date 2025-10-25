@@ -117,9 +117,6 @@ void PowerManager::enterDeepSleep() {
     if (displayPtr != nullptr) {
         displayPtr->sleep();
     }
-    if (scalePtr != nullptr) {
-        scalePtr->sleep();
-    }
     // Flush serial output
     Serial.flush();
     esp_pm_config_t pm_config = {
