@@ -5,3 +5,6 @@
 .vscode/ipch
 managed_components
 .dummy
+sdkconfig.*
+src/idf_component.yml
+src/idf_component.yml.orig
