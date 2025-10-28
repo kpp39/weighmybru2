@@ -16,6 +16,7 @@
 #include "BatteryMonitor.h"
 #include <FreeRTOS.h>
 #include <esp_pm.h>
+#include <cstdio>
 
 // Pins and calibration
 uint8_t dataPin = 5;   // HX711 Data pin (moved from 12)
@@ -76,7 +77,16 @@ void TaskLog(void *pvParameters) {
 
     static const int listBufferSize = 1024;
     static char listBuffer[listBufferSize];
-
+    static const int locksBufferSize = 1024;
+    char* locksBuffer = (char*) malloc(locksBufferSize);
+    if (locksBuffer == NULL) {
+      Serial.println("Не удалось выделить память");
+    }
+    FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
+    if (mem_file == NULL) {
+      Serial.println("Не удалось создать вирт.файл");
+      free(locksBuffer);
+    }
     while (true) {
         Serial.println("\n============ Task Stats ============");
 
@@ -85,16 +95,20 @@ void TaskLog(void *pvParameters) {
         vTaskGetRunTimeStats(statsBuffer);
         Serial.println("Run Time Stats:");
         Serial.println(statsBuffer);
-
+        //get locks
+        Serial.println("Locks List:");
+        esp_pm_dump_locks(mem_file);
+        Serial.println(locksBuffer);
+        Serial.println("=====================================");
         // Get task list with state, priority, stack, and task number
         // Note: vTaskList output depends on configuration and may not include core affinities by default
         // vTaskList(listBuffer);
         // Serial.println("Task List:");
         // Serial.println(listBuffer);
-
+        
         // Serial.println("=====================================");
-
         vTaskDelay(5000 / portTICK_PERIOD_MS);
+
     }
 } 
 void setup() {
