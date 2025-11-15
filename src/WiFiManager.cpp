@@ -320,7 +320,7 @@ void printWiFiStatus(void * parameter) {
     }
     Serial.println("WiFi Sleep: " + String(WiFi.getSleep() ? "ON" : "OFF"));
     Serial.println("==================");
-        vTaskDelay(30000 / portTICK_PERIOD_MS);
+    vTaskDelay(30000 / portTICK_PERIOD_MS);
         // xTaskDelayUntil(&lastStatusUpdate, 30000 / portTICK_PERIOD_MS);
     }
 }
@@ -331,71 +331,71 @@ void maintainWiFi(void * parameter) {
     // const TickType_t maintenanceInterval = ; // Every 15 seconds for more responsive switching
     for(;;){
         if (isWiFiEnabled()) {     
-        // if (millis() - lastMaintenance >= maintenanceInterval) {
-            // lastMaintenance = millis();
+            // if (millis() - lastMaintenance >= maintenanceInterval) {
+                // lastMaintenance = millis();
         
-        // Check current WiFi mode and connection health
-        wifi_mode_t currentMode = WiFi.getMode();
-        
-        if (currentMode == WIFI_STA) {
-            // We're in STA mode - check if connection is still healthy
-            if (WiFi.status() != WL_CONNECTED) {
-                Serial.println("WARNING: STA connection lost! Attempting immediate reconnection...");
-                
-                // Try to reconnect to saved credentials
-                char ssid[33] = {0};
-                char password[65] = {0};
-                loadWiFiCredentials(ssid, password, sizeof(ssid));
-                
-                if (strlen(ssid) > 0) {
-                    Serial.println("Attempting to reconnect to: " + String(ssid));
-                    WiFi.begin(ssid, password);
-                    
-                    // Wait briefly for reconnection - reduced timeout for faster fallback
-                    int attempts = 0;
-                    while (WiFi.status() != WL_CONNECTED && attempts < 6) { // 3 second timeout
-                        delay(500);
-                        Serial.print(".");
-                        attempts++;
-                    }
-                    
-                    if (WiFi.status() == WL_CONNECTED) {
-                        Serial.println("\nSTA reconnection successful");
-                        Serial.println("IP: " + WiFi.localIP().toString());
+            // Check current WiFi mode and connection health
+            wifi_mode_t currentMode = WiFi.getMode();
+            
+            if (currentMode == WIFI_STA) {
+                // We're in STA mode - check if connection is still healthy
+                if (WiFi.status() != WL_CONNECTED) {
+                    Serial.println("WARNING: STA connection lost! Attempting immediate reconnection...");
+
+                    // Try to reconnect to saved credentials
+                    char ssid[33] = {0};
+                    char password[65] = {0};
+                    loadWiFiCredentials(ssid, password, sizeof(ssid));
+
+                    if (strlen(ssid) > 0) {
+                        Serial.println("Attempting to reconnect to: " + String(ssid));
+                        WiFi.begin(ssid, password);
+
+                        // Wait briefly for reconnection - reduced timeout for faster fallback
+                        int attempts = 0;
+                        while (WiFi.status() != WL_CONNECTED && attempts < 6) { // 3 second timeout
+                            delay(500);
+                            Serial.print(".");
+                            attempts++;
+                        }
+
+                        if (WiFi.status() == WL_CONNECTED) {
+                            Serial.println("\nSTA reconnection successful");
+                            Serial.println("IP: " + WiFi.localIP().toString());
+                        } else {
+                            Serial.println("\nSTA reconnection failed - switching to AP mode immediately");
+                            switchToAPMode();
+                        }
                     } else {
-                        Serial.println("\nSTA reconnection failed - switching to AP mode immediately");
+                        Serial.println("No stored credentials - switching to AP mode");
                         switchToAPMode();
                     }
                 } else {
-                    Serial.println("No stored credentials - switching to AP mode");
-                    switchToAPMode();
+                    Serial.println("STA mode healthy - connection maintained");
+                    Serial.println("Connected to: " + WiFi.SSID() + " | IP: " + WiFi.localIP().toString() + " | RSSI: " + String(WiFi.RSSI()) + "dBm");
                 }
-            } else {
-                Serial.println("STA mode healthy - connection maintained");
-                Serial.println("Connected to: " + WiFi.SSID() + " | IP: " + WiFi.localIP().toString() + " | RSSI: " + String(WiFi.RSSI()) + "dBm");
+            } else if (currentMode == WIFI_AP) {
+                // We're in AP mode - just ensure it's still running properly
+                if (WiFi.softAPgetStationNum() == 0) {
+                    Serial.println("AP mode active - 'WeighMyBru-AP' ready for configuration");
+                } else {
+                    Serial.println("AP mode active - " + String(WiFi.softAPgetStationNum()) + " clients connected");
+                }
+            } else if (currentMode == WIFI_OFF) {
+                Serial.println("CRITICAL: WiFi is OFF! This should not happen - restarting AP mode");
+                switchToAPMode();
             }
-        } else if (currentMode == WIFI_AP) {
-            // We're in AP mode - just ensure it's still running properly
-            if (WiFi.softAPgetStationNum() == 0) {
-                Serial.println("AP mode active - 'WeighMyBru-AP' ready for configuration");
-            } else {
-                Serial.println("AP mode active - " + String(WiFi.softAPgetStationNum()) + " clients connected");
+
+            // Ensure WiFi sleep stays enabled for BLE coexistence
+            if (!WiFi.getSleep()) {
+                Serial.println("WARNING: WiFi sleep was disabled! Re-enabling for BLE coexistence...");
+                WiFi.setSleep(true);
             }
-        } else if (currentMode == WIFI_OFF) {
-            Serial.println("CRITICAL: WiFi is OFF! This should not happen - restarting AP mode");
-            switchToAPMode();
+
+            // Print status for debugging
+            Serial.println("WiFi maintenance check completed");
         }
-        
-        // Ensure WiFi sleep stays enabled for BLE coexistence
-        if (!WiFi.getSleep()) {
-            Serial.println("WARNING: WiFi sleep was disabled! Re-enabling for BLE coexistence...");
-            WiFi.setSleep(true);
-        }
-        
-        // Print status for debugging
-        Serial.println("WiFi maintenance check completed");
-    }
-        xTaskDelayUntil(&lastMaintenance, 15000/portTICK_PERIOD_MS);
+    vTaskDelay(15000/portTICK_PERIOD_MS);
     }    
 }
 

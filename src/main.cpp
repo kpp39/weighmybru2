@@ -16,7 +16,7 @@
 #include "BatteryMonitor.h"
 #include <FreeRTOS.h>
 #include <esp_pm.h>
-#include <cstdio>
+
 
 // Pins and calibration
 uint8_t dataPin = 5;   // HX711 Data pin (moved from 12)
@@ -62,57 +62,72 @@ void bleUpdate(void * parameter){
     xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
   }
 }
-void checkWiFiStatus(void * parameter){
-  TickType_t lastTick = xTaskGetTickCount();
-  for(;;){
-    float weight = scale.getWeight();
-    flowRate.update(weight);
-    xTaskDelayUntil(&lastTick, 50 / portTICK_PERIOD_MS);
-  }
-}
 
-void TaskLog(void *pvParameters) {
-    static const int statsBufferSize = 1024;
-    static char statsBuffer[statsBufferSize];
 
-    static const int listBufferSize = 1024;
-    static char listBuffer[listBufferSize];
-    static const int locksBufferSize = 1024;
-    char* locksBuffer = (char*) malloc(locksBufferSize);
-    if (locksBuffer == NULL) {
-      Serial.println("Не удалось выделить память");
-    }
-    FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
-    if (mem_file == NULL) {
-      Serial.println("Не удалось создать вирт.файл");
-      free(locksBuffer);
-    }
-    while (true) {
-        Serial.println("\n============ Task Stats ============");
-
-        // Get runtime stats for CPU usage
-        // This requires configGENERATE_RUN_TIME_STATS to be enabled
-        vTaskGetRunTimeStats(statsBuffer);
-        Serial.println("Run Time Stats:");
-        Serial.println(statsBuffer);
-        //get locks
-        Serial.println("Locks List:");
-        esp_pm_dump_locks(mem_file);
-        Serial.println(locksBuffer);
-        Serial.println("=====================================");
-        // Get task list with state, priority, stack, and task number
-        // Note: vTaskList output depends on configuration and may not include core affinities by default
-        // vTaskList(listBuffer);
-        // Serial.println("Task List:");
-        // Serial.println(listBuffer);
+// void TaskLog(void *pvParameters) {
+//   static const int statsBufferSize = 1024;
+//   static char statsBuffer[statsBufferSize];
+  
+//   static const int listBufferSize = 1024;
+//   static char listBuffer[listBufferSize];
+//   static const int locksBufferSize = 2048;
+//   // char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
+//   // if (locksBuffer == NULL) {
+//   //   Serial.println("Не удалось выделить память");
+//   // }
+//   // FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
+//   // if (mem_file == NULL) {
+//   //   Serial.println("Не удалось создать вирт.файл");
+//   //   vPortFree(locksBuffer);
+//   // }
+//   while (true) {
+// //     // xSemaphoreTake(SerialMutex, portMAX_DELAY);
+//     Serial.println("\n============ Task Stats ============");
+    
+//     // Get runtime stats for CPU usage
+//     // This requires configGENERATE_RUN_TIME_STATS to be enabled
+//         vTaskGetRunTimeStats(statsBuffer);
+//         Serial.println("Run Time Stats:");
+//         Serial.println(statsBuffer);
+//         //get locks
+//         // Serial.println("Locks List:");
+//         char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
+//         if (locksBuffer == NULL) {
+//           Serial.println("Не удалось выделить память");
+//         } else {
+//           FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
+//           if (mem_file == NULL) {
+//             Serial.println("Не удалось создать вирт.файл");
+//             vPortFree(locksBuffer);
+//           } else {
+//             esp_pm_dump_locks(mem_file);
+//             Serial.println(locksBuffer);
+//             Serial.println("=====================================");
+//             fclose(mem_file);
+//             vPortFree(locksBuffer);            
+//           }
+//         }
+//         // Get task list with state, priority, stack, and task number
+//         // Note: vTaskList output depends on configuration and may not include core affinities by default
+//         vTaskList(listBuffer);
+//         Serial.println("Task List:");
+//         Serial.println(listBuffer);
         
-        // Serial.println("=====================================");
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+//         Serial.println("=====================================");
+//         //xSemaphoreGive(SerialMutex);
+//         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-    }
-} 
+//     }
+// } 
 void setup() {
+  esp_pm_config_t pm_config = {
+      .max_freq_mhz = 80, // Maximum CPU frequency when needed
+      .min_freq_mhz = 5,  // Minimum CPU frequency when idle
+      .light_sleep_enable = true // Enable automatic light sleep
+  };
+  
   Serial.begin(115200);
+  // Serial.begin(921600);
   
   // Link scale and flow rate for tare operation coordination
   scale.setFlowRatePtr(&flowRate);
@@ -295,13 +310,10 @@ void setup() {
   //       NULL
   //   );
 
-  esp_pm_config_t pm_config = {
-      .max_freq_mhz = 240, // Maximum CPU frequency when needed
-      .min_freq_mhz = 80,  // Minimum CPU frequency when idle
-      .light_sleep_enable = true // Enable automatic light sleep
-  };
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }
 
 // void loop() {}
-void loop() {vTaskDelay(100);}
+// void loop() {vTaskDelay(100);}
+// void loop() {vTaskDelay(1000);vTaskDelete(NULL);}
+void loop() {vTaskDelete(NULL);}
