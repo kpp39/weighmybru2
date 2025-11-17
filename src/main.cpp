@@ -64,65 +64,66 @@ void bleUpdate(void * parameter){
 }
 
 
-// void TaskLog(void *pvParameters) {
-//   static const int statsBufferSize = 1024;
-//   static char statsBuffer[statsBufferSize];
+void TaskLog(void *pvParameters) {
+  static const int statsBufferSize = 1024;
+  static char statsBuffer[statsBufferSize];
   
-//   static const int listBufferSize = 1024;
-//   static char listBuffer[listBufferSize];
-//   static const int locksBufferSize = 2048;
-//   // char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
-//   // if (locksBuffer == NULL) {
-//   //   Serial.println("Не удалось выделить память");
-//   // }
-//   // FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
-//   // if (mem_file == NULL) {
-//   //   Serial.println("Не удалось создать вирт.файл");
-//   //   vPortFree(locksBuffer);
-//   // }
-//   while (true) {
-// //     // xSemaphoreTake(SerialMutex, portMAX_DELAY);
-//     Serial.println("\n============ Task Stats ============");
+  static const int listBufferSize = 1024;
+  static char listBuffer[listBufferSize];
+  static const int locksBufferSize = 2048;
+  // char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
+  // if (locksBuffer == NULL) {
+  //   Serial.println("Не удалось выделить память");
+  // }
+  // FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
+  // if (mem_file == NULL) {
+  //   Serial.println("Не удалось создать вирт.файл");
+  //   vPortFree(locksBuffer);
+  // }
+  while (true) {
+//     // xSemaphoreTake(SerialMutex, portMAX_DELAY);
+    Serial.println("\n============ Task Stats ============");
     
-//     // Get runtime stats for CPU usage
-//     // This requires configGENERATE_RUN_TIME_STATS to be enabled
-//         vTaskGetRunTimeStats(statsBuffer);
-//         Serial.println("Run Time Stats:");
-//         Serial.println(statsBuffer);
-//         //get locks
-//         // Serial.println("Locks List:");
-//         char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
-//         if (locksBuffer == NULL) {
-//           Serial.println("Не удалось выделить память");
-//         } else {
-//           FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
-//           if (mem_file == NULL) {
-//             Serial.println("Не удалось создать вирт.файл");
-//             vPortFree(locksBuffer);
-//           } else {
-//             esp_pm_dump_locks(mem_file);
-//             Serial.println(locksBuffer);
-//             Serial.println("=====================================");
-//             fclose(mem_file);
-//             vPortFree(locksBuffer);            
-//           }
-//         }
-//         // Get task list with state, priority, stack, and task number
-//         // Note: vTaskList output depends on configuration and may not include core affinities by default
-//         vTaskList(listBuffer);
-//         Serial.println("Task List:");
-//         Serial.println(listBuffer);
+    // Get runtime stats for CPU usage
+    // This requires configGENERATE_RUN_TIME_STATS to be enabled
+        vTaskGetRunTimeStats(statsBuffer);
+        Serial.println("Run Time Stats:");
+        Serial.println(statsBuffer);
+        //get locks
+        Serial.println("Locks List:");
+        char* locksBuffer = (char*) pvPortMalloc(locksBufferSize);
+        if (locksBuffer == NULL) {
+          Serial.println("Не удалось выделить память");
+        } else {
+          FILE* mem_file = fmemopen(locksBuffer, locksBufferSize, "w");
+          if (mem_file == NULL) {
+            Serial.println("Не удалось создать вирт.файл");
+            vPortFree(locksBuffer);
+          } else {
+            esp_pm_dump_locks(mem_file);
+            Serial.println(locksBuffer);
+            Serial.println("=====================================");
+            fclose(mem_file);
+            vPortFree(locksBuffer);            
+          }
+        }
+        // Get task list with state, priority, stack, and task number
+        // Note: vTaskList output depends on configuration and may not include core affinities by default
+        vTaskList(listBuffer);
+        Serial.println("Task List:");
+        Serial.println(listBuffer);
         
-//         Serial.println("=====================================");
-//         //xSemaphoreGive(SerialMutex);
-//         vTaskDelay(5000 / portTICK_PERIOD_MS);
+        Serial.println("=====================================");
+        //xSemaphoreGive(SerialMutex);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-//     }
-// } 
+    }
+} 
 void setup() {
   esp_pm_config_t pm_config = {
       .max_freq_mhz = 80, // Maximum CPU frequency when needed
       .min_freq_mhz = 5,  // Minimum CPU frequency when idle
+      // .light_sleep_enable = false // Enable automatic light sleep
       .light_sleep_enable = true // Enable automatic light sleep
   };
   
@@ -304,7 +305,7 @@ void setup() {
   // xTaskCreate(
   //       TaskLog,     // Функция задачи
   //       "Log",       // Имя задачи
-  //       2048,        // Увеличили размер стека для доп. вычислений
+  //       10000,        // Увеличили размер стека для доп. вычислений
   //       NULL,        // Параметры задачи
   //       1,           // Приоритет задачи
   //       NULL
